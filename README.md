@@ -44,6 +44,20 @@
 
 ---
 
+### Modularity – Use Your Own AI Provider
+
+Consent Watcher Lite has been designed to be easily customizable. The core logic that sends the website's privacy policy for analysis is contained in the `analyzePolicy()` function.
+
+You can replace the OpenAI API with another AI service (e.g., Claude, Mistral, Cohere, or even a local LLM) by modifying this single function.
+
+#### How to customize
+1. Open the userscript in Tampermonkey.
+2. Locate the `analyzePolicy()` function.
+3. Replace the OpenAI API call with your own API logic.
+4. Make sure your replacement returns a string with the analysis summary.
+
+---
+
 ## Privacy
 
 - Only visible page text is sent to OpenAI’s API for analysis.
