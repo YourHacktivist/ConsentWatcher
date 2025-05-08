@@ -1,10 +1,14 @@
 <div align="center">
 
+<p align="center">
+  <img src="banner.png" alt="Consent Watcher Banner" width="50%">
+</p>
+
 # Consent Watcher Lite
 
-[![Userscript Manager](https://img.shields.io/badge/Userscript%20Manager-Tampermonkey-brightgreen?style=for-the-badge&logo=tampermonkey)](https://www.tampermonkey.net/)
-[![License](https://img.shields.io/badge/License-WTFPL-green?style=for-the-badge)](LICENSE)
-[![Maintenance](https://img.shields.io/badge/Maintained-yes-brightgreen?style=for-the-badge)](https://github.com/your-username/your-repo-name/graphs/commit-activity)
+[![Userscript Manager](https://img.shields.io/badge/Userscript%20Manager-Tampermonkey-blue?style=for-the-badge&logo=tampermonkey)](https://www.tampermonkey.net/)
+[![License](https://img.shields.io/badge/License-WTFPL-blue?style=for-the-badge)](LICENSE)
+[![Maintenance](https://img.shields.io/badge/Maintained-yes-blue?style=for-the-badge)](https://github.com/your-username/your-repo-name/graphs/commit-activity)
 
 <i>Analyze privacy policies effortlessly, right in your browser.</i>
 
