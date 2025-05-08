@@ -76,6 +76,7 @@
     }
 
     // Function to analyze the privacy policy using OpenAI API
+    // You can edit this function to add your own AI model
     async function analyzePolicy(text) {
         const prompt = `
 You are a privacy assistant. Analyze the following privacy policy and provide concise answers to these questions, ensuring each point starts on a new line:
