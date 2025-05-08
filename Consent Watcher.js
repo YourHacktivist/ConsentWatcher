@@ -9,7 +9,7 @@
 // @connect     api.openai.com
 // ==/UserScript==
 
-(function() {
+(function() { 
     'use strict';
 
     const openAiApiKey = 'your-api-key-here';
@@ -18,7 +18,7 @@
     let isDragging = false;
     let offsetX, offsetY;
     const primaryColor = '#4361ee'; // Main color
-    const primaryLightColor = '#4cc9f0';
+    const primaryLightColor = '#4cc9f0'; // Secondary color
     const textColor = '#212121';
     const cardBackgroundColor = '#fff';
     const boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
