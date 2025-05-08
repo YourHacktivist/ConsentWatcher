@@ -12,7 +12,7 @@
 (function() { 
     'use strict';
 
-    const openAiApiKey = 'your-api-key-here';
+    const openAiApiKey = 'your-api-key-here'; // DON'T FORGET to add you API key here or it won't work
     
     let analysisPopup = null;
     let isDragging = false;
