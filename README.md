@@ -39,7 +39,7 @@
 3. Open the script and set your OpenAI API key in the `openAiApiKey` variable:
    ```js
    const openAiApiKey = 'your-api-key-here';
-4. Visit any site, click "Analyze Privacy Policy," and view the results in a popup.
+4. Visit any site, click "Analyze Privacy Policy" on the terms of use page, and view the results in a popup.
 
 ---
 
