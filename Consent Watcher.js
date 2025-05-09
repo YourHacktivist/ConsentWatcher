@@ -9,11 +9,11 @@
 // @connect     api.openai.com
 // ==/UserScript==
 
-(function() { 
+(function() {
     'use strict';
 
-    const openAiApiKey = 'your-api-key-here'; // DON'T FORGET to add you API key here or it won't work
-    
+    const openAiApiKey = 'your-api-key-here';
+
     let analysisPopup = null;
     let isDragging = false;
     let offsetX, offsetY;
@@ -59,7 +59,7 @@
             setTimeout(() => circle.remove(), 600);
             runAnalysis();
         });
-        
+
         // Add ripple effect
         const rippleStyle = document.createElement("style");
         rippleStyle.innerHTML = `
@@ -70,7 +70,7 @@
             }
         }`;
         document.head.appendChild(rippleStyle);
-        
+
 
         document.body.appendChild(button);
     }
@@ -104,7 +104,10 @@ Policy content:
 
         const body = JSON.stringify({
             model: "gpt-4", // or "gpt-3.5-turbo"
-            messages: [{ role: "user", content: fullPrompt }],
+            messages: [{
+                role: "user",
+                content: fullPrompt
+            }],
             temperature: 0.3
         });
 
@@ -141,61 +144,61 @@ Policy content:
     }
 
     // Function to show a loading popup while analyzing
-function showLoadingPopup() {
-    const primaryColor = '#4361ee';
-    const primaryLight = '#4cc9f0';
-    const cardBackgroundColor = '#ffffff';
-    const borderRadius = '16px';
-    const boxShadow = '0 15px 40px rgba(0, 0, 0, 0.1)';
-    const fontFamily = `'Inter', sans-serif`;
+    function showLoadingPopup() {
+        const primaryColor = '#4361ee';
+        const primaryLight = '#4cc9f0';
+        const cardBackgroundColor = '#ffffff';
+        const borderRadius = '16px';
+        const boxShadow = '0 15px 40px rgba(0, 0, 0, 0.1)';
+        const fontFamily = `'Inter', sans-serif`;
 
-    analysisPopup = document.createElement('div');
-    analysisPopup.style.position = 'fixed';
-    analysisPopup.style.top = '50%';
-    analysisPopup.style.left = '50%';
-    analysisPopup.style.transform = 'translate(-50%, -50%)';
-    analysisPopup.style.backgroundColor = cardBackgroundColor;
-    analysisPopup.style.border = `1px solid ${primaryLight}`;
-    analysisPopup.style.padding = '40px 30px';
-    analysisPopup.style.zIndex = 99999;
-    analysisPopup.style.borderRadius = borderRadius;
-    analysisPopup.style.boxShadow = boxShadow;
-    analysisPopup.style.fontFamily = fontFamily;
-    analysisPopup.style.color = primaryColor;
-    analysisPopup.style.textAlign = 'center';
-    analysisPopup.style.minWidth = '320px';
-    analysisPopup.style.transition = 'opacity 0.4s ease';
+        analysisPopup = document.createElement('div');
+        analysisPopup.style.position = 'fixed';
+        analysisPopup.style.top = '50%';
+        analysisPopup.style.left = '50%';
+        analysisPopup.style.transform = 'translate(-50%, -50%)';
+        analysisPopup.style.backgroundColor = cardBackgroundColor;
+        analysisPopup.style.border = `1px solid ${primaryLight}`;
+        analysisPopup.style.padding = '40px 30px';
+        analysisPopup.style.zIndex = 99999;
+        analysisPopup.style.borderRadius = borderRadius;
+        analysisPopup.style.boxShadow = boxShadow;
+        analysisPopup.style.fontFamily = fontFamily;
+        analysisPopup.style.color = primaryColor;
+        analysisPopup.style.textAlign = 'center';
+        analysisPopup.style.minWidth = '320px';
+        analysisPopup.style.transition = 'opacity 0.4s ease';
 
-    const title = document.createElement('div');
-    title.style.fontSize = '20px';
-    title.style.fontWeight = '600';
-    title.textContent = 'Consent Watcher is scanning...';
-    analysisPopup.appendChild(title);
+        const title = document.createElement('div');
+        title.style.fontSize = '20px';
+        title.style.fontWeight = '600';
+        title.textContent = 'Consent Watcher is scanning...';
+        analysisPopup.appendChild(title);
 
-    const subtitle = document.createElement('div');
-    subtitle.style.marginTop = '8px';
-    subtitle.style.fontSize = '14px';
-    subtitle.style.color = '#8d99ae';
-    subtitle.textContent = 'Analyzing terms for data privacy risks';
-    analysisPopup.appendChild(subtitle);
+        const subtitle = document.createElement('div');
+        subtitle.style.marginTop = '8px';
+        subtitle.style.fontSize = '14px';
+        subtitle.style.color = '#8d99ae';
+        subtitle.textContent = 'Analyzing terms for data privacy risks';
+        analysisPopup.appendChild(subtitle);
 
-    const radarWrapper = document.createElement('div');
-    radarWrapper.className = 'radar-wrapper';
-    analysisPopup.appendChild(radarWrapper);
+        const radarWrapper = document.createElement('div');
+        radarWrapper.className = 'radar-wrapper';
+        analysisPopup.appendChild(radarWrapper);
 
-    const radarSweep = document.createElement('div');
-    radarSweep.className = 'radar-sweep';
-    radarWrapper.appendChild(radarSweep);
+        const radarSweep = document.createElement('div');
+        radarSweep.className = 'radar-sweep';
+        radarWrapper.appendChild(radarSweep);
 
-    const radarDot = document.createElement('div');
-    radarDot.className = 'radar-dot';
-    radarWrapper.appendChild(radarDot);
+        const radarDot = document.createElement('div');
+        radarDot.className = 'radar-dot';
+        radarWrapper.appendChild(radarDot);
 
-    document.body.appendChild(analysisPopup);
+        document.body.appendChild(analysisPopup);
 
-    const styleSheet = document.createElement("style");
-    styleSheet.type = "text/css";
-    styleSheet.innerText = `
+        const styleSheet = document.createElement("style");
+        styleSheet.type = "text/css";
+        styleSheet.innerText = `
         .radar-wrapper {
             margin: 30px auto 0;
             width: 100px;
@@ -258,127 +261,212 @@ function showLoadingPopup() {
             100% { transform: rotate(360deg) translateX(-50%) translateY(-45px); }
         }
     `;
-    document.head.appendChild(styleSheet);
-}
-    
+        document.head.appendChild(styleSheet);
+    }
+
+
+    function parseGPTResponse(text) {
+        const sections = {
+            dataCollection: '',
+            dataSharing: '',
+            tracking: '',
+            userRights: '',
+            gdprScore: '',
+            privacyAdvice: '',
+        };
+
+        const regexMap = {
+            dataCollection: /^1\.\s\*\*Data Collection:\*\*(.*?)^2\./ms,
+            dataSharing: /^2\.\s\*\*Data Sharing:\*\*(.*?)^3\./ms,
+            tracking: /^3\.\s\*\*Tracking:\*\*(.*?)^4\./ms,
+            userRights: /^4\.\s\*\*User Rights:\*\*(.*?)^5\./ms,
+            gdprScore: /^5\.\s\*\*GDPR Score:\*\*(.*?)^6\./ms,
+            privacyAdvice: /^6\.\s\*\*Privacy Advice:\*\*(.*)$/ms,
+        };
+
+        for (const [key, regex] of Object.entries(regexMap)) {
+            const match = text.match(regex);
+            if (match) sections[key] = match[1].trim();
+        }
+
+        return sections;
+    }
 
     // Function to show the analysis result in a popup
-    function showAnalysisPopup(result) {
-        if (analysisPopup) {
-            analysisPopup.remove();
-        }
-    
-        const box = document.createElement('div');
-        box.style.position = 'fixed';
-        box.style.top = '50px';
-        box.style.right = '50px';
-        box.style.backgroundColor = cardBackgroundColor;
-        box.style.border = `1px solid ${primaryLightColor}`;
-        box.style.padding = '30px';
-        box.style.zIndex = 99999;
-        box.style.maxWidth = '600px';
-        box.style.maxHeight = '80vh';
-        box.style.overflowY = 'auto';
-        box.style.fontSize = '15.5px';
-        box.style.fontFamily = fontFamily;
-        box.style.lineHeight = '1.8';
-        box.style.color = textColor;
-        box.style.boxShadow = '0 10px 40px rgba(0, 0, 0, 0.2)';
-        box.style.borderRadius = '18px';
-        box.style.cursor = 'grab';
-        box.style.backdropFilter = 'blur(12px)';
-        box.style.transition = 'opacity 0.3s ease';
-        box.style.opacity = '0';
-        setTimeout(() => box.style.opacity = '1', 10); // smooth fade-in
-    
-        // Make draggable
-        box.addEventListener('mousedown', (e) => {
+    async function showAnalysisPopup(gptResponseText) {
+        if (analysisPopup) analysisPopup.remove();
+
+        const parsed = parseGPTResponse(gptResponseText);
+
+        const sections = [{
+                icon: '📥',
+                label: 'Collected data',
+                key: 'dataCollection'
+            },
+            {
+                icon: '🔄',
+                label: 'Data sharing',
+                key: 'dataSharing'
+            },
+            {
+                icon: '🍪',
+                label: 'Tracking',
+                key: 'tracking'
+            },
+            {
+                icon: '🧑‍⚖️',
+                label: 'User rights',
+                key: 'userRights'
+            },
+            {
+                icon: '📊',
+                label: 'GDPR score',
+                key: 'gdprScore'
+            },
+            {
+                icon: '💡',
+                label: 'Privacy advice',
+                key: 'privacyAdvice'
+            },
+        ];
+
+        const container = document.createElement('div');
+        container.style.cssText = `
+        position: fixed;
+        top: 60px;
+        left: 60px;
+        width: 760px;
+        height: 520px;
+        display: flex;
+        background: #ffffffee;
+        border-radius: 18px;
+        box-shadow: 0 18px 36px rgba(0,0,0,0.25);
+        backdrop-filter: blur(14px);
+        z-index: 99999;
+        overflow: hidden;
+        font-family: system-ui, sans-serif;
+    `;
+
+        let isDragging = false,
+            offsetX, offsetY;
+        container.addEventListener('mousedown', (e) => {
             isDragging = true;
-            offsetX = e.clientX - box.getBoundingClientRect().left;
-            offsetY = e.clientY - box.getBoundingClientRect().top;
-            box.style.cursor = 'grabbing';
+            offsetX = e.clientX - container.getBoundingClientRect().left;
+            offsetY = e.clientY - container.getBoundingClientRect().top;
         });
-    
         document.addEventListener('mousemove', (e) => {
             if (!isDragging) return;
-            box.style.left = e.clientX - offsetX + 'px';
-            box.style.top = e.clientY - offsetY + 'px';
+            container.style.left = `${e.clientX - offsetX}px`;
+            container.style.top = `${e.clientY - offsetY}px`;
         });
-    
         document.addEventListener('mouseup', () => {
             isDragging = false;
-            box.style.cursor = 'grab';
         });
-    
-        const titleBar = document.createElement('div');
-        titleBar.style.display = 'flex';
-        titleBar.style.justifyContent = 'space-between';
-        titleBar.style.alignItems = 'center';
-        titleBar.style.marginBottom = '20px';
-        titleBar.style.borderBottom = `1px solid ${primaryLightColor}`;
-        titleBar.style.paddingBottom = '10px';
-    
-        const title = document.createElement('h2');
-        title.textContent = '🔍 Consent Watcher Report';
-        title.style.margin = '0';
-        title.style.fontSize = '20px';
-        title.style.color = primaryColor;
-        title.style.letterSpacing = '0.5px';
-    
-        const closeBtn = document.createElement('button');
-        closeBtn.textContent = '×';
-        closeBtn.style.background = 'none';
-        closeBtn.style.border = 'none';
-        closeBtn.style.fontSize = '26px';
-        closeBtn.style.cursor = 'pointer';
-        closeBtn.style.color = '#999';
-        closeBtn.style.transition = 'color 0.2s ease';
-        closeBtn.addEventListener('click', () => box.remove());
-        closeBtn.addEventListener('mouseover', () => closeBtn.style.color = primaryColor);
-        closeBtn.addEventListener('mouseout', () => closeBtn.style.color = '#999');
-    
-        titleBar.appendChild(title);
-        titleBar.appendChild(closeBtn);
-        box.appendChild(titleBar);
-    
-        const content = document.createElement('div');
-        content.style.marginTop = '10px';
-        content.innerHTML = formatResponse(result);
-        box.appendChild(content);
-    
-        const reportButton = document.createElement('button');
-        reportButton.textContent = '📄 Export HTML Report';
-        reportButton.style.background = primaryColor;
-        reportButton.style.color = 'white';
-        reportButton.style.padding = '12px 20px';
-        reportButton.style.border = 'none';
-        reportButton.style.borderRadius = '12px';
-        reportButton.style.cursor = 'pointer';
-        reportButton.style.fontSize = '15px';
-        reportButton.style.fontFamily = fontFamily;
-        reportButton.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
-        reportButton.style.marginTop = '25px';
-        reportButton.style.transition = 'background 0.2s ease, transform 0.2s ease';
-    
-        reportButton.addEventListener('mouseover', () => {
-            reportButton.style.background = primaryLightColor;
-            reportButton.style.transform = 'scale(1.03)';
+
+        const sidebar = document.createElement('div');
+        sidebar.style.cssText = `
+        width: 190px;
+        background: #f5f5f5;
+        border-right: 1px solid #ddd;
+        display: flex;
+        flex-direction: column;
+        padding: 10px;
+    `;
+
+        const contentArea = document.createElement('div');
+        contentArea.style.cssText = `
+        flex: 1;
+        padding: 25px;
+        overflow-y: auto;
+        font-size: 15px;
+        color: #333;
+        line-height: 1.7;
+        position: relative;
+    `;
+
+        const exportBtn = document.createElement('button');
+        exportBtn.textContent = '📄 Export HTML';
+        exportBtn.style.cssText = `
+        position: absolute;
+        bottom: 20px;
+        right: 25px;
+        background: #3b82f6;
+        color: white;
+        padding: 10px 16px;
+        font-size: 14px;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        transition: background 0.2s ease;
+    `;
+        exportBtn.addEventListener('mouseover', () => exportBtn.style.background = '#2563eb');
+        exportBtn.addEventListener('mouseout', () => exportBtn.style.background = '#3b82f6');
+        exportBtn.addEventListener('click', () => generateHTMLReport(gptResponseText));
+
+        function renderSection(key, label) {
+            contentArea.innerHTML = `
+            <h2 style="margin-top: 0; font-size: 18px; color: #1e40af;">${label}</h2>
+            <div style="white-space: pre-wrap;">${parsed[key] || '❌ Aucun contenu trouvé.'}</div>
+        `;
+            contentArea.appendChild(exportBtn);
+        }
+
+        sections.forEach(({
+            icon,
+            label,
+            key
+        }) => {
+            const btn = document.createElement('button');
+            btn.innerHTML = `${icon} ${label}`;
+            btn.style.cssText = `
+            background: none;
+            border: none;
+            padding: 10px 12px;
+            border-radius: 12px;
+            margin: 4px 0;
+            text-align: left;
+            font-size: 14px;
+            cursor: pointer;
+            color: #444;
+            transition: background 0.2s;
+        `;
+            btn.addEventListener('click', () => renderSection(key, label));
+            btn.addEventListener('mouseover', () => btn.style.background = '#e0e0e0');
+            btn.addEventListener('mouseout', () => btn.style.background = 'none');
+            sidebar.appendChild(btn);
         });
-        reportButton.addEventListener('mouseout', () => {
-            reportButton.style.background = primaryColor;
-            reportButton.style.transform = 'scale(1)';
-        });
-        reportButton.addEventListener('click', () => generateHTMLReport(result));
-        box.appendChild(reportButton);
-    
-        document.body.appendChild(box);
+
+        const closeBtn = document.createElement('div');
+        closeBtn.innerHTML = '×';
+        closeBtn.style.cssText = `
+        position: absolute;
+        top: 10px;
+        right: 18px;
+        font-size: 24px;
+        color: #777;
+        cursor: pointer;
+    `;
+        closeBtn.addEventListener('click', () => container.remove());
+
+        container.appendChild(sidebar);
+        container.appendChild(contentArea);
+        container.appendChild(closeBtn);
+        document.body.appendChild(container);
+
+        // default section
+        renderSection(sections[0].key, sections[0].label);
     }
-    
+
+
+    function getSectionContent(key, parsed) {
+        return `<div style="white-space: pre-wrap;">${parsed[key].trim()}</div>`;
+    }
 
     // Function to generate HTML report from the analysis result
     function generateHTMLReport(analysisResult) {
         const formattedResult = formatResponse(analysisResult);
-    
+
         let gdprScore = 'N/A';
         const gdprRegex = /5\.\s*\*\*GDPR Score:\*\*\s*([0-9\.]+)/i;
         const scoreMatch = analysisResult.match(gdprRegex);
@@ -391,7 +479,7 @@ function showLoadingPopup() {
                 gdprScore = altMatch[1].trim();
             }
         }
-    
+
         const htmlReport = `
         <!DOCTYPE html>
         <html lang="en">
@@ -639,8 +727,10 @@ function showLoadingPopup() {
         </body>
         </html>
         `;
-    
-        const blob = new Blob([htmlReport], { type: 'text/html' });
+
+        const blob = new Blob([htmlReport], {
+            type: 'text/html'
+        });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -650,7 +740,7 @@ function showLoadingPopup() {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }
-    
+
     // Function to show a loading popup while analyzing
     async function runAnalysis() {
         const text = extractVisibleText();
@@ -669,7 +759,7 @@ function showLoadingPopup() {
 
     // Add CSS styles for the popup and button
     const styleEnhancer = document.createElement("style");
-styleEnhancer.innerHTML = `
+    styleEnhancer.innerHTML = `
 @keyframes fadeInScale {
     0% { opacity: 0; transform: scale(0.9); }
     100% { opacity: 1; transform: scale(1); }
@@ -699,6 +789,6 @@ div.analysis-popup, div.loading-popup {
     background-color: ${primaryColor};
 }
 `;
-document.head.appendChild(styleEnhancer);
+    document.head.appendChild(styleEnhancer);
 
 })();
