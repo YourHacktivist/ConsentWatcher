@@ -18,7 +18,7 @@
     let isDragging = false;
     let offsetX, offsetY;
     const primaryColor = '#4361ee'; // Main color
-    const primaryLightColor = '#4cc9f0'; // Secondary color
+    const primaryLightColor = '#4cc9f0';
     const textColor = '#212121';
     const cardBackgroundColor = '#fff';
     const boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
@@ -76,7 +76,6 @@
     }
 
     // Function to analyze the privacy policy using OpenAI API
-    // You can edit this function to add your own AI model and prompt
     async function analyzePolicy(text) {
         const prompt = `
 You are a privacy assistant. Analyze the following privacy policy and provide concise answers to these questions, ensuring each point starts on a new line:
@@ -142,67 +141,156 @@ Policy content:
     }
 
     // Function to show a loading popup while analyzing
-    function showLoadingPopup() {
-        analysisPopup = document.createElement('div');
-        analysisPopup.style.position = 'fixed';
-        analysisPopup.style.top = '50%';
-        analysisPopup.style.left = '50%';
-        analysisPopup.style.transform = 'translate(-50%, -50%)';
-        analysisPopup.style.backgroundColor = cardBackgroundColor;
-        analysisPopup.style.border = `1px solid ${primaryLightColor}`;
-        analysisPopup.style.padding = '30px';
-        analysisPopup.style.zIndex = 99999;
-        analysisPopup.style.borderRadius = borderRadius;
-        analysisPopup.style.boxShadow = boxShadow;
-        analysisPopup.style.fontFamily = fontFamily;
-        analysisPopup.style.color = primaryColor;
-        analysisPopup.style.fontSize = '18px';
-        analysisPopup.style.fontWeight = 'bold';
-        analysisPopup.textContent = 'Analyzing Privacy Policy...';
+function showLoadingPopup() {
+    const primaryColor = '#4361ee';
+    const primaryLight = '#4cc9f0';
+    const cardBackgroundColor = '#ffffff';
+    const borderRadius = '16px';
+    const boxShadow = '0 15px 40px rgba(0, 0, 0, 0.1)';
+    const fontFamily = `'Inter', sans-serif`;
 
-        const loader = document.createElement('div');
-        loader.style.border = '5px solid #f3f3f3';
-        loader.style.borderTop = `5px solid ${primaryColor}`;
-        loader.style.borderRadius = '50%';
-        loader.style.width = '40px';
-        loader.style.height = '40px';
-        loader.style.margin = '15px auto 0';
-        loader.style.animation = 'spin 2s linear infinite';
+    analysisPopup = document.createElement('div');
+    analysisPopup.style.position = 'fixed';
+    analysisPopup.style.top = '50%';
+    analysisPopup.style.left = '50%';
+    analysisPopup.style.transform = 'translate(-50%, -50%)';
+    analysisPopup.style.backgroundColor = cardBackgroundColor;
+    analysisPopup.style.border = `1px solid ${primaryLight}`;
+    analysisPopup.style.padding = '40px 30px';
+    analysisPopup.style.zIndex = 99999;
+    analysisPopup.style.borderRadius = borderRadius;
+    analysisPopup.style.boxShadow = boxShadow;
+    analysisPopup.style.fontFamily = fontFamily;
+    analysisPopup.style.color = primaryColor;
+    analysisPopup.style.textAlign = 'center';
+    analysisPopup.style.minWidth = '320px';
+    analysisPopup.style.transition = 'opacity 0.4s ease';
 
-        const styleSheet = document.createElement("style");
-        styleSheet.type = "text/css";
-        styleSheet.innerText = `@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`;
-        document.head.appendChild(styleSheet);
+    const title = document.createElement('div');
+    title.style.fontSize = '20px';
+    title.style.fontWeight = '600';
+    title.textContent = 'Consent Watcher is scanning...';
+    analysisPopup.appendChild(title);
 
-        analysisPopup.appendChild(loader);
-        document.body.appendChild(analysisPopup);
-    }
+    const subtitle = document.createElement('div');
+    subtitle.style.marginTop = '8px';
+    subtitle.style.fontSize = '14px';
+    subtitle.style.color = '#8d99ae';
+    subtitle.textContent = 'Analyzing terms for data privacy risks';
+    analysisPopup.appendChild(subtitle);
+
+    const radarWrapper = document.createElement('div');
+    radarWrapper.className = 'radar-wrapper';
+    analysisPopup.appendChild(radarWrapper);
+
+    const radarSweep = document.createElement('div');
+    radarSweep.className = 'radar-sweep';
+    radarWrapper.appendChild(radarSweep);
+
+    const radarDot = document.createElement('div');
+    radarDot.className = 'radar-dot';
+    radarWrapper.appendChild(radarDot);
+
+    document.body.appendChild(analysisPopup);
+
+    const styleSheet = document.createElement("style");
+    styleSheet.type = "text/css";
+    styleSheet.innerText = `
+        .radar-wrapper {
+            margin: 30px auto 0;
+            width: 100px;
+            height: 100px;
+            position: relative;
+        }
+        .radar-wrapper::before,
+        .radar-wrapper::after {
+            content: '';
+            position: absolute;
+            border: 2px solid rgba(67, 97, 238, 0.2);
+            border-radius: 50%;
+            animation: pulse-circle 2s infinite ease-in-out;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .radar-wrapper::before {
+            width: 100px;
+            height: 100px;
+            animation-delay: 0s;
+        }
+        .radar-wrapper::after {
+            width: 130px;
+            height: 130px;
+            animation-delay: 1s;
+        }
+        .radar-sweep {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: conic-gradient(rgba(41, 255, 94, 0.5), transparent 30%, transparent 100%);
+            animation: sweep 2s linear infinite;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        .radar-dot {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background-color: transparent;
+            border-radius: 50%;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            animation: rotate-dot 2s linear infinite;
+        }
+        @keyframes sweep {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes pulse-circle {
+            0% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.6; }
+            50% { transform: translate(-50%, -50%) scale(1); opacity: 0.3; }
+            100% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.6; }
+        }
+        @keyframes rotate-dot {
+            0% { transform: rotate(0deg) translateX(-50%) translateY(-45px); }
+            100% { transform: rotate(360deg) translateX(-50%) translateY(-45px); }
+        }
+    `;
+    document.head.appendChild(styleSheet);
+}
+    
 
     // Function to show the analysis result in a popup
     function showAnalysisPopup(result) {
         if (analysisPopup) {
             analysisPopup.remove();
         }
-
+    
         const box = document.createElement('div');
         box.style.position = 'fixed';
         box.style.top = '50px';
         box.style.right = '50px';
         box.style.backgroundColor = cardBackgroundColor;
         box.style.border = `1px solid ${primaryLightColor}`;
-        box.style.padding = '25px';
+        box.style.padding = '30px';
         box.style.zIndex = 99999;
         box.style.maxWidth = '600px';
         box.style.maxHeight = '80vh';
         box.style.overflowY = 'auto';
-        box.style.fontSize = '16px';
+        box.style.fontSize = '15.5px';
         box.style.fontFamily = fontFamily;
-        box.style.lineHeight = '1.7';
+        box.style.lineHeight = '1.8';
         box.style.color = textColor;
-        box.style.boxShadow = boxShadow;
-        box.style.borderRadius = borderRadius;
+        box.style.boxShadow = '0 10px 40px rgba(0, 0, 0, 0.2)';
+        box.style.borderRadius = '18px';
         box.style.cursor = 'grab';
-
+        box.style.backdropFilter = 'blur(12px)';
+        box.style.transition = 'opacity 0.3s ease';
+        box.style.opacity = '0';
+        setTimeout(() => box.style.opacity = '1', 10); // smooth fade-in
+    
         // Make draggable
         box.addEventListener('mousedown', (e) => {
             isDragging = true;
@@ -210,70 +298,82 @@ Policy content:
             offsetY = e.clientY - box.getBoundingClientRect().top;
             box.style.cursor = 'grabbing';
         });
-
+    
         document.addEventListener('mousemove', (e) => {
             if (!isDragging) return;
             box.style.left = e.clientX - offsetX + 'px';
             box.style.top = e.clientY - offsetY + 'px';
         });
-
+    
         document.addEventListener('mouseup', () => {
             isDragging = false;
             box.style.cursor = 'grab';
         });
-
+    
         const titleBar = document.createElement('div');
         titleBar.style.display = 'flex';
         titleBar.style.justifyContent = 'space-between';
         titleBar.style.alignItems = 'center';
-        titleBar.style.marginBottom = '15px';
-        titleBar.style.paddingBottom = '10px';
+        titleBar.style.marginBottom = '20px';
         titleBar.style.borderBottom = `1px solid ${primaryLightColor}`;
-
+        titleBar.style.paddingBottom = '10px';
+    
         const title = document.createElement('h2');
-        title.textContent = 'Privacy Policy Analysis';
+        title.textContent = '🔍 Consent Watcher Report';
         title.style.margin = '0';
+        title.style.fontSize = '20px';
         title.style.color = primaryColor;
-
+        title.style.letterSpacing = '0.5px';
+    
         const closeBtn = document.createElement('button');
         closeBtn.textContent = '×';
         closeBtn.style.background = 'none';
         closeBtn.style.border = 'none';
-        closeBtn.style.fontSize = '24px';
+        closeBtn.style.fontSize = '26px';
         closeBtn.style.cursor = 'pointer';
-        closeBtn.style.color = '#757575';
+        closeBtn.style.color = '#999';
+        closeBtn.style.transition = 'color 0.2s ease';
         closeBtn.addEventListener('click', () => box.remove());
-        closeBtn.addEventListener('mouseover', () => closeBtn.style.color = textColor);
-        closeBtn.addEventListener('mouseout', () => closeBtn.style.color = '#757575');
-
+        closeBtn.addEventListener('mouseover', () => closeBtn.style.color = primaryColor);
+        closeBtn.addEventListener('mouseout', () => closeBtn.style.color = '#999');
+    
         titleBar.appendChild(title);
         titleBar.appendChild(closeBtn);
         box.appendChild(titleBar);
-
+    
         const content = document.createElement('div');
-        content.style.marginTop = '15px';
+        content.style.marginTop = '10px';
         content.innerHTML = formatResponse(result);
         box.appendChild(content);
-
+    
         const reportButton = document.createElement('button');
-        reportButton.textContent = 'Generate HTML Report';
-        reportButton.style.backgroundColor = primaryColor;
+        reportButton.textContent = '📄 Export HTML Report';
+        reportButton.style.background = primaryColor;
         reportButton.style.color = 'white';
-        reportButton.style.padding = '10px 15px';
+        reportButton.style.padding = '12px 20px';
         reportButton.style.border = 'none';
-        reportButton.style.borderRadius = borderRadius;
+        reportButton.style.borderRadius = '12px';
         reportButton.style.cursor = 'pointer';
-        reportButton.style.fontSize = '14px';
+        reportButton.style.fontSize = '15px';
         reportButton.style.fontFamily = fontFamily;
-        reportButton.style.boxShadow = boxShadow;
-        reportButton.style.marginTop = '20px';
-        reportButton.addEventListener('mouseover', () => reportButton.style.backgroundColor = primaryLightColor);
-        reportButton.addEventListener('mouseout', () => reportButton.style.backgroundColor = primaryColor);
+        reportButton.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+        reportButton.style.marginTop = '25px';
+        reportButton.style.transition = 'background 0.2s ease, transform 0.2s ease';
+    
+        reportButton.addEventListener('mouseover', () => {
+            reportButton.style.background = primaryLightColor;
+            reportButton.style.transform = 'scale(1.03)';
+        });
+        reportButton.addEventListener('mouseout', () => {
+            reportButton.style.background = primaryColor;
+            reportButton.style.transform = 'scale(1)';
+        });
         reportButton.addEventListener('click', () => generateHTMLReport(result));
         box.appendChild(reportButton);
-
+    
         document.body.appendChild(box);
     }
+    
 
     // Function to generate HTML report from the analysis result
     function generateHTMLReport(analysisResult) {
@@ -298,7 +398,7 @@ Policy content:
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Privacy Policy Analysis Report</title>
+            <title>Consent Watcher - Privacy Policy Analysis Report</title>
             <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
             <style>
                 :root {
@@ -493,7 +593,7 @@ Policy content:
         <body>
             <div class="container">
                 <header>
-                    <h1>Privacy Policy Analysis</h1>
+                    <h1>Consent Watcher - Privacy Policy Analysis</h1>
                     <p class="subtitle">Comprehensive report on data handling practices</p>
                 </header>
     
@@ -527,15 +627,15 @@ Policy content:
                     </div>
     
                     <div class="report-card full-width-card">
-                        <h3>Privacy Advice</h3>
+                        <h3 id="advices">Privacy Advice</h3>
                         <p class="advice">${formattedResult.split('<br>6. ')[1] || 'N/A'}</p>
                     </div>
                 </div>
             </div>
     
-            <div class="floating-icon" title="Download Report">
-                ↓
-            </div>
+            <div class="floating-icon" title="Download Report" onclick="document.getElementById('advices').scrollIntoView({ behavior: 'smooth' });">
+                     ↓
+                    </div>
         </body>
         </html>
         `;
