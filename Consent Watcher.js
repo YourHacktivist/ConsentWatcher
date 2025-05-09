@@ -60,17 +60,6 @@
             runAnalysis();
         });
 
-        // Add ripple effect
-        const rippleStyle = document.createElement("style");
-        rippleStyle.innerHTML = `
-        @keyframes ripple {
-            to {
-                transform: scale(4);
-                opacity: 0;
-            }
-        }`;
-        document.head.appendChild(rippleStyle);
-
 
         document.body.appendChild(button);
     }
@@ -147,7 +136,7 @@ Policy content:
     function showLoadingPopup() {
         const primaryColor = '#4361ee';
         const primaryLight = '#4cc9f0';
-        const cardBackgroundColor = '#ffffff';
+        const cardBackgroundColor = '#1B1212';
         const borderRadius = '16px';
         const boxShadow = '0 15px 40px rgba(0, 0, 0, 0.1)';
         const fontFamily = `'Inter', sans-serif`;
@@ -293,19 +282,20 @@ Policy content:
     }
 
     function deleteAllCookies() {
-    const cookies = document.cookie.split(";");
+        const cookies = document.cookie.split(";");
 
-    for (let cookie of cookies) {
-        const eqPos = cookie.indexOf("=");
-        const name = eqPos > -1 ? cookie.substring(0, eqPos) : cookie;
-        document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
-        document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=" + location.hostname;
+        for (let cookie of cookies) {
+            const eqPos = cookie.indexOf("=");
+            const name = eqPos > -1 ? cookie.substring(0, eqPos) : cookie;
+            document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+            document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=" + location.hostname;
+        }
     }
-}
+
     function showConfirmation(message) {
-    const msg = document.createElement('div');
-    msg.textContent = message;
-    msg.style.cssText = `
+        const msg = document.createElement('div');
+        msg.textContent = message;
+        msg.style.cssText = `
         position: fixed;
         bottom: 20px;
         right: 20px;
@@ -318,10 +308,10 @@ Policy content:
         z-index: 999999;
         animation: fadeInOut 3s ease forwards;
     `;
-    document.body.appendChild(msg);
+        document.body.appendChild(msg);
 
-    setTimeout(() => msg.remove(), 3000);
-}
+        setTimeout(() => msg.remove(), 3000);
+    }
     // Function to show the analysis result in a popup
     async function showAnalysisPopup(gptResponseText) {
         if (analysisPopup) analysisPopup.remove();
@@ -358,6 +348,11 @@ Policy content:
                 label: 'Privacy advice',
                 key: 'privacyAdvice'
             },
+            {
+                icon: '📚',
+                label: 'Resources',
+                key: 'resources'
+            }
         ];
 
         const container = document.createElement('div');
@@ -368,9 +363,9 @@ Policy content:
         width: 760px;
         height: 520px;
         display: flex;
-        background: #ffffffee;
+        background: #181818;
         border-radius: 18px;
-        box-shadow: 0 18px 36px rgba(0,0,0,0.25);
+        box-shadow: 0 18px 36px rgba(0,0,0,0.35);
         backdrop-filter: blur(14px);
         z-index: 99999;
         overflow: hidden;
@@ -396,9 +391,10 @@ Policy content:
         const sidebar = document.createElement('div');
         sidebar.style.cssText = `
         width: 190px;
-        background: #f5f5f5;
-        border-right: 1px solid #ddd;
+        background: #121212;
+        border-right: 1px solid #303030;
         display: flex;
+        font-color: #fff;
         flex-direction: column;
         padding: 10px;
     `;
@@ -409,7 +405,7 @@ Policy content:
         padding: 25px;
         overflow-y: auto;
         font-size: 15px;
-        color: #333;
+        color: #e2e8f0;
         line-height: 1.7;
         position: relative;
     `;
@@ -420,46 +416,71 @@ Policy content:
         position: absolute;
         bottom: 20px;
         right: 25px;
-        background: #3b82f6;
+        background: #4361ee;
         color: white;
         padding: 10px 16px;
         font-size: 14px;
         border: none;
         border-radius: 10px;
         cursor: pointer;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
         transition: background 0.2s ease;
     `;
-        exportBtn.addEventListener('mouseover', () => exportBtn.style.background = '#2563eb');
-        exportBtn.addEventListener('mouseout', () => exportBtn.style.background = '#3b82f6');
+        exportBtn.addEventListener('mouseover', () => exportBtn.style.background = '#4cc9f0');
+        exportBtn.addEventListener('mouseout', () => exportBtn.style.background = '#4361ee');
         exportBtn.addEventListener('click', () => generateHTMLReport(gptResponseText));
 
         function renderSection(key, label) {
-    contentArea.innerHTML = `
-        <h2 style="margin-top: 0; font-size: 18px; color: #1e40af;">${label}</h2>
-        <div style="white-space: pre-wrap; margin-bottom: 20px;">${parsed[key] || '❌ Aucun contenu trouvé.'}</div>
+            contentArea.innerHTML = `
+       <h2 style="
+        margin-top: 0;
+        font-size: 20px;
+        color: #fff;
+        border-bottom: 1px solid #e5e7eb;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+    ">${label}</h2>
+`;
+
+
+            const textBlock = document.createElement('div');
+            textBlock.textContent = parsed[key] || '';
+            textBlock.style.cssText = `
+        white-space: pre-wrap;
+        background: #242424;
+        border: 1px solid #303030;
+        border-radius: 10px;
+        padding: 18px;
+        font-size: 15px;
+        line-height: 1.75;
+        color: #d1d5db;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+        margin-bottom: 25px;
     `;
 
-    // Ajout du switch dans la section "Tracking"
-    if (key === 'tracking') {
-        const toggleContainer = document.createElement('div');
-        toggleContainer.style.cssText = `
+
+            contentArea.appendChild(textBlock);
+
+            if (key === 'tracking') {
+
+                const toggleContainer = document.createElement('div');
+                toggleContainer.style.cssText = `
             display: flex;
             align-items: center;
             gap: 12px;
             margin-bottom: 25px;
         `;
 
-        const labelEl = document.createElement('label');
-        labelEl.textContent = '🔒 Bloquer les cookies';
-        labelEl.style.fontWeight = 'bold';
+                const labelEl = document.createElement('label');
+                labelEl.textContent = '🔒 Block cookies';
+                labelEl.style.fontWeight = 'bold';
 
-        const toggle = document.createElement('input');
-        toggle.type = 'checkbox';
-        toggle.style.display = 'none';
+                const toggle = document.createElement('input');
+                toggle.type = 'checkbox';
+                toggle.style.display = 'none';
 
-        const customSwitch = document.createElement('span');
-        customSwitch.style.cssText = `
+                const customSwitch = document.createElement('span');
+                customSwitch.style.cssText = `
             width: 42px;
             height: 24px;
             background: #ccc;
@@ -470,8 +491,8 @@ Policy content:
             cursor: pointer;
         `;
 
-        const knob = document.createElement('span');
-        knob.style.cssText = `
+                const knob = document.createElement('span');
+                knob.style.cssText = `
             width: 20px;
             height: 20px;
             background: white;
@@ -482,29 +503,107 @@ Policy content:
             transition: left 0.3s;
             box-shadow: 0 1px 4px rgba(0,0,0,0.2);
         `;
-        customSwitch.appendChild(knob);
+                customSwitch.appendChild(knob);
 
-        customSwitch.addEventListener('click', () => {
-            toggle.checked = !toggle.checked;
+                customSwitch.addEventListener('click', () => {
+                    toggle.checked = !toggle.checked;
 
-            if (toggle.checked) {
-                customSwitch.style.background = '#22c55e'; // vert
-                knob.style.left = '20px';
-                deleteAllCookies();
-                showConfirmation("Cookies bloqués ✅");
-            } else {
-                customSwitch.style.background = '#ccc';
-                knob.style.left = '2px';
+                    if (toggle.checked) {
+                        customSwitch.style.background = '#22c55e';
+                        knob.style.left = '20px';
+                        deleteAllCookies();
+                        showConfirmation("Cookies blocked ✅");
+                    } else {
+                        customSwitch.style.background = '#ccc';
+                        knob.style.left = '2px';
+                    }
+                });
+
+                toggleContainer.appendChild(labelEl);
+                toggleContainer.appendChild(customSwitch);
+                contentArea.appendChild(toggleContainer);
+
+            } else if (key === 'resources') {
+
+                const title = document.createElement('h2');
+                title.textContent = '🔗 Additional resources';
+                title.style.cssText = `
+        margin-bottom: 16px;
+        font-size: 17px;
+        color: #e2e8f0;
+        border-bottom: 1px solid #3e4c5e;
+        padding-bottom: 8px;
+    `;
+
+                const grid = document.createElement('div');
+                grid.style.cssText = `
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+    `;
+
+                const links = [{
+                        name: 'ShutUpTracker',
+                        url: 'https://shutuptrackers.com',
+                        desc: 'A crowdsourced directory of mobile apps that track users.'
+                    },
+                    {
+                        name: 'Tails',
+                        url: 'https://tails.net/',
+                        desc: 'A live operating system focused on privacy and anonymity.'
+                    },
+                    {
+                        name: 'PrivacyTools',
+                        url: 'https://www.privacytools.io/',
+                        desc: 'A curated list of privacy-focused tools and services.'
+                    },
+                    {
+                        name: 'Privacy Badger',
+                        url: 'https://privacybadger.org/',
+                        desc: 'A browser extension that blocks invisible trackers.'
+                    }
+                ];
+
+                links.forEach(link => {
+                    const card = document.createElement('div');
+                    card.style.cssText = `
+            background: #242424;
+            border: 1px solid #303030;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        `;
+                    card.addEventListener('mouseenter', () => {
+                        card.style.transform = 'translateY(-2px)';
+                        card.style.boxShadow = '0 6px 16px rgba(0,0,0,0.3)';
+                        card.style.borderColor = '#4cc9f0';
+                    });
+                    card.addEventListener('mouseleave', () => {
+                        card.style.transform = 'none';
+                        card.style.boxShadow = '0 2px 6px rgba(0,0,0,0.2)';
+                        card.style.borderColor = '#303030';
+                    });
+
+                    card.innerHTML = `
+            <h4 style="margin: 0 0 8px; font-size: 15px; color: #4cc9f0;">
+                <a href="${link.url}" target="_blank" style="text-decoration: none; color: inherit;">
+                    ${link.name} ↗
+                </a>
+            </h4>
+            <p style="margin: 0; font-size: 13px; color: #d1d5db;">${link.desc}</p>
+        `;
+
+                    grid.appendChild(card);
+                });
+
+                contentArea.appendChild(title);
+                contentArea.appendChild(grid);
             }
-        });
 
-        toggleContainer.appendChild(labelEl);
-        toggleContainer.appendChild(customSwitch);
-        contentArea.appendChild(toggleContainer);
-    }
-
-    contentArea.appendChild(exportBtn);
-}
+            contentArea.appendChild(exportBtn);
+        }
 
         sections.forEach(({
             icon,
@@ -522,11 +621,11 @@ Policy content:
             text-align: left;
             font-size: 14px;
             cursor: pointer;
-            color: #444;
+            color: #e2e8f0;
             transition: background 0.2s;
         `;
             btn.addEventListener('click', () => renderSection(key, label));
-            btn.addEventListener('mouseover', () => btn.style.background = '#e0e0e0');
+            btn.addEventListener('mouseover', () => btn.style.background = '#303030');
             btn.addEventListener('mouseout', () => btn.style.background = 'none');
             sidebar.appendChild(btn);
         });
