@@ -292,6 +292,36 @@ Policy content:
         return sections;
     }
 
+    function deleteAllCookies() {
+    const cookies = document.cookie.split(";");
+
+    for (let cookie of cookies) {
+        const eqPos = cookie.indexOf("=");
+        const name = eqPos > -1 ? cookie.substring(0, eqPos) : cookie;
+        document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+        document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=" + location.hostname;
+    }
+}
+    function showConfirmation(message) {
+    const msg = document.createElement('div');
+    msg.textContent = message;
+    msg.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: #22c55e;
+        color: white;
+        padding: 12px 18px;
+        border-radius: 10px;
+        font-size: 14px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        z-index: 999999;
+        animation: fadeInOut 3s ease forwards;
+    `;
+    document.body.appendChild(msg);
+
+    setTimeout(() => msg.remove(), 3000);
+}
     // Function to show the analysis result in a popup
     async function showAnalysisPopup(gptResponseText) {
         if (analysisPopup) analysisPopup.remove();
@@ -405,12 +435,76 @@ Policy content:
         exportBtn.addEventListener('click', () => generateHTMLReport(gptResponseText));
 
         function renderSection(key, label) {
-            contentArea.innerHTML = `
-            <h2 style="margin-top: 0; font-size: 18px; color: #1e40af;">${label}</h2>
-            <div style="white-space: pre-wrap;">${parsed[key] || '❌ Aucun contenu trouvé.'}</div>
+    contentArea.innerHTML = `
+        <h2 style="margin-top: 0; font-size: 18px; color: #1e40af;">${label}</h2>
+        <div style="white-space: pre-wrap; margin-bottom: 20px;">${parsed[key] || '❌ Aucun contenu trouvé.'}</div>
+    `;
+
+    // Ajout du switch dans la section "Tracking"
+    if (key === 'tracking') {
+        const toggleContainer = document.createElement('div');
+        toggleContainer.style.cssText = `
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 25px;
         `;
-            contentArea.appendChild(exportBtn);
-        }
+
+        const labelEl = document.createElement('label');
+        labelEl.textContent = '🔒 Bloquer les cookies';
+        labelEl.style.fontWeight = 'bold';
+
+        const toggle = document.createElement('input');
+        toggle.type = 'checkbox';
+        toggle.style.display = 'none';
+
+        const customSwitch = document.createElement('span');
+        customSwitch.style.cssText = `
+            width: 42px;
+            height: 24px;
+            background: #ccc;
+            border-radius: 12px;
+            position: relative;
+            display: inline-block;
+            transition: background 0.3s;
+            cursor: pointer;
+        `;
+
+        const knob = document.createElement('span');
+        knob.style.cssText = `
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            transition: left 0.3s;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+        `;
+        customSwitch.appendChild(knob);
+
+        customSwitch.addEventListener('click', () => {
+            toggle.checked = !toggle.checked;
+
+            if (toggle.checked) {
+                customSwitch.style.background = '#22c55e'; // vert
+                knob.style.left = '20px';
+                deleteAllCookies();
+                showConfirmation("Cookies bloqués ✅");
+            } else {
+                customSwitch.style.background = '#ccc';
+                knob.style.left = '2px';
+            }
+        });
+
+        toggleContainer.appendChild(labelEl);
+        toggleContainer.appendChild(customSwitch);
+        contentArea.appendChild(toggleContainer);
+    }
+
+    contentArea.appendChild(exportBtn);
+}
 
         sections.forEach(({
             icon,
