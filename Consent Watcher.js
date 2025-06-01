@@ -431,16 +431,20 @@ Policy content:
         exportBtn.addEventListener('click', () => generateHTMLReport(gptResponseText));
 
         function renderSection(key, label) {
-            contentArea.innerHTML = `
-       <h2 style="
+            contentArea.innerHTML = '';
+
+            const header = document.createElement('h2');
+            header.textContent = label;
+            header.style.cssText = `
         margin-top: 0;
         font-size: 20px;
         color: #fff;
         border-bottom: 1px solid #e5e7eb;
         padding-bottom: 10px;
         margin-bottom: 20px;
-    ">${label}</h2>
-`;
+    `;
+            contentArea.appendChild(header);
+            
 
 
             const textBlock = document.createElement('div');
@@ -580,23 +584,26 @@ Policy content:
                         card.style.boxShadow = '0 6px 16px rgba(0,0,0,0.3)';
                         card.style.borderColor = '#4cc9f0';
                     });
-                    card.addEventListener('mouseleave', () => {
-                        card.style.transform = 'none';
-                        card.style.boxShadow = '0 2px 6px rgba(0,0,0,0.2)';
-                        card.style.borderColor = '#303030';
-                    });
+                     const h4 = document.createElement('h4');
+                    h4.style.cssText = 'margin: 0 0 8px; font-size: 15px; color: #4cc9f0;';
 
-                    card.innerHTML = `
-            <h4 style="margin: 0 0 8px; font-size: 15px; color: #4cc9f0;">
-                <a href="${link.url}" target="_blank" style="text-decoration: none; color: inherit;">
-                    ${link.name} ↗
-                </a>
-            </h4>
-            <p style="margin: 0; font-size: 13px; color: #d1d5db;">${link.desc}</p>
-        `;
+                    const a = document.createElement('a');
+                    a.href = link.url;
+                    a.target = '_blank';
+                    a.style.cssText = 'text-decoration: none; color: inherit;';
+                    a.textContent = `${link.name} ↗`;
 
+                    h4.appendChild(a);
+
+                    const p = document.createElement('p');
+                    p.style.cssText = 'margin: 0; font-size: 13px; color: #d1d5db;';
+                    p.textContent = link.desc;
+
+                    card.appendChild(h4);
+                    card.appendChild(p);
                     grid.appendChild(card);
                 });
+
 
                 contentArea.appendChild(title);
                 contentArea.appendChild(grid);
@@ -605,25 +612,30 @@ Policy content:
             contentArea.appendChild(exportBtn);
         }
 
-        sections.forEach(({
-            icon,
-            label,
-            key
-        }) => {
+        sections.forEach(({ icon, label, key }) => {
             const btn = document.createElement('button');
-            btn.innerHTML = `${icon} ${label}`;
+
+            const spanIcon = document.createElement('span');
+            spanIcon.textContent = icon;
+
+            const spanLabel = document.createElement('span');
+            spanLabel.textContent = ` ${label}`;
+
+            btn.appendChild(spanIcon);
+            btn.appendChild(spanLabel);
+
             btn.style.cssText = `
-            background: none;
-            border: none;
-            padding: 10px 12px;
-            border-radius: 12px;
-            margin: 4px 0;
-            text-align: left;
-            font-size: 14px;
-            cursor: pointer;
-            color: #e2e8f0;
-            transition: background 0.2s;
-        `;
+        background: none;
+        border: none;
+        padding: 10px 12px;
+        border-radius: 12px;
+        margin: 4px 0;
+        text-align: left;
+        font-size: 14px;
+        cursor: pointer;
+        color: #e2e8f0;
+        transition: background 0.2s;
+    `;
             btn.addEventListener('click', () => renderSection(key, label));
             btn.addEventListener('mouseover', () => btn.style.background = '#303030');
             btn.addEventListener('mouseout', () => btn.style.background = 'none');
@@ -631,15 +643,15 @@ Policy content:
         });
 
         const closeBtn = document.createElement('div');
-        closeBtn.innerHTML = '×';
+        closeBtn.textContent = '×';
         closeBtn.style.cssText = `
-        position: absolute;
-        top: 10px;
-        right: 18px;
-        font-size: 24px;
-        color: #777;
-        cursor: pointer;
-    `;
+    position: absolute;
+    top: 10px;
+    right: 18px;
+    font-size: 24px;
+    color: #777;
+    cursor: pointer;
+`;
         closeBtn.addEventListener('click', () => container.remove());
 
         container.appendChild(sidebar);
@@ -952,7 +964,7 @@ Policy content:
 
     // Add CSS styles for the popup and button
     const styleEnhancer = document.createElement("style");
-    styleEnhancer.innerHTML = `
+    styleEnhancer.textContent = `
 @keyframes fadeInScale {
     0% { opacity: 0; transform: scale(0.9); }
     100% { opacity: 1; transform: scale(1); }
