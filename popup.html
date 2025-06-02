@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Privacy Policy Analyzer</title>
+    <style>
+        body {
+            width: 320px;
+            padding: 20px;
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin: 0;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            margin: 0 0 5px 0;
+            font-weight: 600;
+        }
+
+        .header p {
+            font-size: 12px;
+            opacity: 0.8;
+            margin: 0;
+        }
+
+        label {
+            display: block;
+            font-size: 14px;
+            margin: 12px 0 4px;
+            font-weight: 500;
+        }
+
+        select,
+        input[type="password"],
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            box-sizing: border-box;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+        }
+
+        .model-select {
+            margin-top: 8px;
+        }
+
+        .confirm-btn {
+            width: 100%;
+            padding: 12px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .confirm-btn:hover {
+            background: #218838;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .confirm-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .status {
+            font-size: 12px;
+            text-align: center;
+            margin-top: 10px;
+            opacity: 0.8;
+        }
+
+        .warning {
+            background: rgba(255, 193, 7, 0.2);
+            border: 1px solid rgba(255, 193, 7, 0.5);
+            border-radius: 6px;
+            padding: 10px;
+            font-size: 12px;
+            margin-bottom: 15px;
+        }
+
+        .success {
+            background: rgba(40, 167, 69, 0.2);
+            border: 1px solid rgba(40, 167, 69, 0.5);
+            border-radius: 6px;
+            padding: 10px;
+            font-size: 12px;
+            margin-top: 10px;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>🔐 Privacy Analyzer</h1>
+        <p>Analysez les politiques de confidentialité</p>
+    </div>
+
+    <div class="warning">
+        ⚠️ Vos clés API sont stockées localement de manière sécurisée.
+    </div>
+
+    <label for="ai-select">Choisir l'IA :</label>
+    <select id="ai-select">
+        <option value="openai">OpenAI</option>
+        <option value="claude">Claude</option>
+        <option value="gemini">Gemini</option>
+        <option value="grok">Grok</option>
+    </select>
+
+    <label for="model-input" class="model-select">Modèle :</label>
+    <input type="text" id="model-input" placeholder="ex: gpt-4o, claude-3-5-sonnet-20241022">
+
+    <label for="api-key">Clé API :</label>
+    <input type="password" id="api-key" placeholder="Clé API pour l'IA choisie">
+
+    <button id="confirm-btn" class="confirm-btn">💾 Confirmer et Enregistrer</button>
+
+    <div id="status" class="status"></div>
+
+    <!-- Utilisation du fichier externe popup.js -->
+    <script src="popup.js"></script>
+</body>
+
+</html>
