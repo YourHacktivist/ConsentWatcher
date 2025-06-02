@@ -1,29 +1,41 @@
-// ==UserScript==
-// @name        Privacy Policy Analyzer Lite
-// @namespace   http://tampermonkey.net/
-// @version     1.2
-// @description Analyzes the privacy policy of the current page on demand using the ChatGPT API (HTML text only) and generate a report in HTML format.
-// @author      Osiris, Lokuste, Dragdead, Neewz
-// @match       *://*/*
-// @grant       GM_xmlhttpRequest
-// @connect     api.openai.com
-// ==/UserScript==
-
-(function() {
+(function () {
     'use strict';
-
-    const openAiApiKey = 'your-api-key-here';
 
     let analysisPopup = null;
     let isDragging = false;
     let offsetX, offsetY;
-    const primaryColor = '#4361ee'; // Main color
+    const primaryColor = '#4361ee';
     const primaryLightColor = '#4cc9f0';
     const textColor = '#212121';
     const cardBackgroundColor = '#fff';
     const boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
     const borderRadius = '8px';
     const fontFamily = 'Roboto, sans-serif';
+
+    // Variables pour stocker la configuration
+    let currentConfig = {
+        selectedAI: 'openai',
+        selectedModel: 'gpt-4',
+        apiKey: ''
+    };
+
+    // Charger la configuration depuis le storage
+    function loadConfig() {
+        return new Promise((resolve) => {
+            chrome.storage.local.get(['selectedAI', 'selectedModel', 'apiKeys'], (result) => {
+                console.log('Configuration chargée:', result); // Debug
+                if (result.selectedAI && result.selectedModel && result.apiKeys) {
+                    currentConfig = {
+                        selectedAI: result.selectedAI,
+                        selectedModel: result.selectedModel,
+                        apiKey: result.apiKeys[result.selectedAI] || ''
+                    };
+                }
+                console.log('Config actuelle:', currentConfig); // Debug
+                resolve(currentConfig);
+            });
+        });
+    }
 
     // Create a button to trigger the analysis
     function createActionButton() {
@@ -41,9 +53,12 @@
         button.style.fontSize = '16px';
         button.style.fontFamily = fontFamily;
         button.style.boxShadow = boxShadow;
+        button.style.zIndex = '10000';
+
         button.addEventListener('mouseover', () => button.style.backgroundColor = primaryLightColor);
         button.addEventListener('mouseout', () => button.style.backgroundColor = primaryColor);
-        button.addEventListener('click', (e) => {
+        button.addEventListener('click', async (e) => {
+            // Effet ripple
             const circle = document.createElement("span");
             circle.style.position = "absolute";
             circle.style.borderRadius = "50%";
@@ -57,31 +72,129 @@
             circle.style.width = circle.style.height = "100px";
             button.appendChild(circle);
             setTimeout(() => circle.remove(), 600);
+
+            // Charger la config et lancer l'analyse
+            await loadConfig();
             runAnalysis();
         });
-
 
         document.body.appendChild(button);
     }
 
-    // Function to analyze the privacy policy using OpenAI API
+    // Créer le payload selon l'IA sélectionnée
+    function createApiPayload(prompt, aiService, model) {
+        switch (aiService) {
+            case 'openai':
+                return {
+                    model: model,
+                    messages: [{
+                        role: "user",
+                        content: prompt
+                    }],
+                    temperature: 0.3,
+                    max_tokens: 4000
+                };
+
+            case 'claude':
+                return {
+                    model: model,
+                    max_tokens: 4000,
+                    messages: [{
+                        role: "user",
+                        content: prompt
+                    }],
+                    temperature: 0.3
+                };
+
+            case 'gemini':
+                return {
+                    contents: [{
+                        parts: [{
+                            text: prompt
+                        }]
+                    }],
+                    generationConfig: {
+                        temperature: 0.3,
+                        maxOutputTokens: 4000
+                    }
+                };
+
+            case 'grok':
+                return {
+                    messages: [{
+                        role: "user",
+                        content: prompt
+                    }],
+                    model: model,
+                    stream: false,
+                    temperature: 0.3,
+                    max_tokens: 4000
+                };
+
+            default:
+                return {
+                    model: model,
+                    messages: [{
+                        role: "user",
+                        content: prompt
+                    }],
+                    temperature: 0.3,
+                    max_tokens: 4000
+                };
+        }
+    }
+
+    // Extraire la réponse selon l'IA
+    function extractResponse(response, aiService) {
+        try {
+            console.log('Réponse brute de l\'API:', response); // Debug
+
+            switch (aiService) {
+                case 'openai':
+                case 'grok':
+                    return response.choices?.[0]?.message?.content || 'Erreur lors de l\'analyse.';
+
+                case 'claude':
+                    return response.content?.[0]?.text || 'Erreur lors de l\'analyse.';
+
+                case 'gemini':
+                    return response.candidates?.[0]?.content?.parts?.[0]?.text || 'Erreur lors de l\'analyse.';
+
+                default:
+                    return response.choices?.[0]?.message?.content || 'Erreur lors de l\'analyse.';
+            }
+        } catch (error) {
+            console.error('Erreur lors de l\'extraction de la réponse:', error);
+            return 'Erreur lors de l\'analyse de la réponse.';
+        }
+    }
+
+    // Function to analyze the privacy policy using selected AI API
     async function analyzePolicy(text) {
+        console.log('Début de l\'analyse avec la config:', currentConfig); // Debug
+
+        if (!currentConfig.apiKey) {
+            console.error('Clé API manquante'); // Debug
+            return 'Erreur: Clé API non configurée. Veuillez configurer votre clé API dans les paramètres de l\'extension.';
+        }
+
         const prompt = `
-You are a privacy assistant. Analyze the following privacy policy and provide concise answers to these questions, ensuring each point starts on a new line:
+You are a privacy assistant. Analyze the following privacy policy and provide concise answers to these questions, making sure each point starts on a new line:
 
-1. **Data Collection:** What types of personal data are collected? (e.g., name, email, browsing history)
--
-2. **Data Sharing:** Is personal data shared with third parties? If so, with whom and for what purpose?
--
-3. **Tracking:** Are cookies or other tracking technologies used? If yes, for what purposes?
--
-4. **User Rights:** What rights do users have regarding their data? (e.g., access, deletion, rectification)
--
-5. **GDPR Score:** Give a GDPR trust score (0 to 10, where 10 is fully compliant and trustworthy).
--
-6. **Privacy Advice:** Provide one key piece of practical privacy advice for the user of this website.
+1. What types of personal data are collected? (e.g., name, email, browsing history)
 
-Format your response with bullet points where applicable. Ensure that each number followed by a period starts on a new line. Use **bold** for emphasis where appropriate as indicated in the questions.
+2. Is personal data shared with third parties? If yes, with whom and for what purpose?
+
+3. Are cookies or other tracking technologies used? If yes, for what purposes?
+
+4. What rights do users have regarding their data? (e.g., access, deletion, rectification)
+
+5. IMPORTANT - Provide a numerical score from 0 to 10 (where 10 is fully compliant and trustworthy). Format: Score: X/10 with explanation.
+
+6. Provide one key practical privacy advice for the user of this website.
+
+IMPORTANT: For the score (point 5), respond EXACTLY in this format: "Score: X/10" where X is a number from 0 to 10.
+Format your response with simple text, no markdown formatting. Make sure each numbered point starts on a new line.
 `;
 
         const policyContent = `
@@ -90,73 +203,118 @@ Policy content:
 `;
 
         const fullPrompt = prompt + policyContent;
+        const payload = createApiPayload(fullPrompt, currentConfig.selectedAI, currentConfig.selectedModel);
 
-        const body = JSON.stringify({
-            model: "gpt-4", // or "gpt-3.5-turbo"
-            messages: [{
-                role: "user",
-                content: fullPrompt
-            }],
-            temperature: 0.3
+        console.log('Payload envoyé:', payload); // Debug
+
+        return new Promise((resolve) => {
+            chrome.runtime.sendMessage({
+                action: 'apiCall',
+                aiService: currentConfig.selectedAI,
+                body: JSON.stringify(payload),
+                apiKey: currentConfig.apiKey
+            }, (response) => {
+                console.log('Réponse reçue du background:', response); // Debug
+
+                if (chrome.runtime.lastError) {
+                    console.error('Erreur runtime:', chrome.runtime.lastError);
+                    resolve('Erreur de communication avec l\'extension.');
+                    return;
+                }
+
+                if (!response) {
+                    console.error('Pas de réponse du background script');
+                    resolve('Erreur: Pas de réponse du serveur.');
+                    return;
+                }
+
+                if (response.error) {
+                    console.error('Erreur API:', response.error);
+                    resolve(`Erreur API: ${response.error}`);
+                    return;
+                }
+
+                const result = extractResponse(response, currentConfig.selectedAI);
+                console.log('Résultat extrait:', result); // Debug
+                resolve(result);
+            });
         });
-
-        const res = await fetch("https://api.openai.com/v1/chat/completions", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${openAiApiKey}`
-            },
-            body: body
-        });
-
-        const data = await res.json();
-        return data.choices?.[0]?.message?.content || 'Error during analysis.';
     }
 
-    // Function to format the response for better readability
-    function formatResponse(responseText) {
-        let formattedText = responseText.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
-        formattedText = formattedText.replace(/(\d+\.)/g, '<br>$1');
-        formattedText = formattedText.replace(/-/g, '<br>-');
-        return formattedText;
+    // Function to extract privacy policy text from the page
+    function extractPrivacyPolicyText() {
+        const selectors = [
+            '[data-testid*="privacy"]',
+            '[class*="privacy"]',
+            '[id*="privacy"]',
+            'main',
+            'article',
+            '.content',
+            '#content',
+            'body'
+        ];
+
+        for (const selector of selectors) {
+            const element = document.querySelector(selector);
+            if (element) {
+                let text = element.innerText || element.textContent || '';
+                text = text.replace(/\s+/g, ' ').trim();
+                if (text.length > 500) {
+                    console.log(`Texte extrait avec le sélecteur ${selector}:`, text.slice(0, 200) + '...'); // Debug
+                    return text;
+                }
+            }
+        }
+
+        const bodyText = document.body.innerText || document.body.textContent || '';
+        console.log('Texte du body:', bodyText.slice(0, 200) + '...'); // Debug
+        return bodyText;
     }
 
     // Function to extract visible text from the page
     function extractVisibleText() {
-        const elements = Array.from(document.body.querySelectorAll('p, div, span, li'));
+        const elements = Array.from(document.body.querySelectorAll('p, div, span, li, h1, h2, h3, h4, h5, h6'));
         const visibleText = elements
-            .filter(el => el.offsetParent !== null)
-            .map(el => el.innerText.trim())
-            .filter(t => t.length > 100)
-            .join('\n');
+            .filter(el => {
+                // Vérifier si l'élément est visible
+                const style = window.getComputedStyle(el);
+                return el.offsetParent !== null &&
+                    style.display !== 'none' &&
+                    style.visibility !== 'hidden' &&
+                    style.opacity !== '0';
+            })
+            .map(el => el.innerText ? el.innerText.trim() : '')
+            .filter(text => text.length > 20) // Filtrer les textes trop courts
+            .join(' ');
+
+        console.log('Texte visible extrait:', visibleText.slice(0, 300) + '...'); // Debug
         return visibleText;
     }
 
     // Function to show a loading popup while analyzing
     function showLoadingPopup() {
-        const primaryColor = '#4361ee';
-        const primaryLight = '#4cc9f0';
-        const cardBackgroundColor = '#1B1212';
-        const borderRadius = '16px';
-        const boxShadow = '0 15px 40px rgba(0, 0, 0, 0.1)';
-        const fontFamily = `'Inter', sans-serif`;
+        if (analysisPopup) {
+            analysisPopup.remove();
+        }
 
         analysisPopup = document.createElement('div');
-        analysisPopup.style.position = 'fixed';
-        analysisPopup.style.top = '50%';
-        analysisPopup.style.left = '50%';
-        analysisPopup.style.transform = 'translate(-50%, -50%)';
-        analysisPopup.style.backgroundColor = cardBackgroundColor;
-        analysisPopup.style.border = `1px solid ${primaryLight}`;
-        analysisPopup.style.padding = '40px 30px';
-        analysisPopup.style.zIndex = 99999;
-        analysisPopup.style.borderRadius = borderRadius;
-        analysisPopup.style.boxShadow = boxShadow;
-        analysisPopup.style.fontFamily = fontFamily;
-        analysisPopup.style.color = primaryColor;
-        analysisPopup.style.textAlign = 'center';
-        analysisPopup.style.minWidth = '320px';
-        analysisPopup.style.transition = 'opacity 0.4s ease';
+        analysisPopup.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1B1212;
+            border: 1px solid ${primaryLightColor};
+            padding: 40px 30px;
+            z-index: 99999;
+            border-radius: 16px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.1);
+            font-family: 'Inter', sans-serif;
+            color: ${primaryColor};
+            text-align: center;
+            min-width: 320px;
+            transition: opacity 0.4s ease;
+        `;
 
         const title = document.createElement('div');
         title.style.fontSize = '20px';
@@ -168,92 +326,38 @@ Policy content:
         subtitle.style.marginTop = '8px';
         subtitle.style.fontSize = '14px';
         subtitle.style.color = '#8d99ae';
-        subtitle.textContent = 'Analyzing terms for data privacy risks';
+        subtitle.textContent = `Analyzing with ${currentConfig.selectedAI.toUpperCase()} - ${currentConfig.selectedModel}`;
         analysisPopup.appendChild(subtitle);
 
-        const radarWrapper = document.createElement('div');
-        radarWrapper.className = 'radar-wrapper';
-        analysisPopup.appendChild(radarWrapper);
-
-        const radarSweep = document.createElement('div');
-        radarSweep.className = 'radar-sweep';
-        radarWrapper.appendChild(radarSweep);
-
-        const radarDot = document.createElement('div');
-        radarDot.className = 'radar-dot';
-        radarWrapper.appendChild(radarDot);
+        // Animation de chargement
+        const spinner = document.createElement('div');
+        spinner.style.cssText = `
+            margin: 30px auto 0;
+            width: 40px;
+            height: 40px;
+            border: 4px solid ${primaryLightColor};
+            border-radius: 50%;
+            border-top-color: ${primaryColor};
+            animation: spin 1s ease-in-out infinite;
+        `;
+        analysisPopup.appendChild(spinner);
 
         document.body.appendChild(analysisPopup);
 
-        const styleSheet = document.createElement("style");
-        styleSheet.type = "text/css";
-        styleSheet.innerText = `
-        .radar-wrapper {
-            margin: 30px auto 0;
-            width: 100px;
-            height: 100px;
-            position: relative;
+        // Ajouter l'animation CSS
+        if (!document.getElementById('loading-styles')) {
+            const style = document.createElement('style');
+            style.id = 'loading-styles';
+            style.textContent = `
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+            `;
+            document.head.appendChild(style);
         }
-        .radar-wrapper::before,
-        .radar-wrapper::after {
-            content: '';
-            position: absolute;
-            border: 2px solid rgba(67, 97, 238, 0.2);
-            border-radius: 50%;
-            animation: pulse-circle 2s infinite ease-in-out;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-        }
-        .radar-wrapper::before {
-            width: 100px;
-            height: 100px;
-            animation-delay: 0s;
-        }
-        .radar-wrapper::after {
-            width: 130px;
-            height: 130px;
-            animation-delay: 1s;
-        }
-        .radar-sweep {
-            width: 100px;
-            height: 100px;
-            border-radius: 50%;
-            background: conic-gradient(rgba(41, 255, 94, 0.5), transparent 30%, transparent 100%);
-            animation: sweep 2s linear infinite;
-            position: absolute;
-            top: 0;
-            left: 0;
-        }
-        .radar-dot {
-            position: absolute;
-            width: 8px;
-            height: 8px;
-            background-color: transparent;
-            border-radius: 50%;
-            top: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            animation: rotate-dot 2s linear infinite;
-        }
-        @keyframes sweep {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        @keyframes pulse-circle {
-            0% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.6; }
-            50% { transform: translate(-50%, -50%) scale(1); opacity: 0.3; }
-            100% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.6; }
-        }
-        @keyframes rotate-dot {
-            0% { transform: rotate(0deg) translateX(-50%) translateY(-45px); }
-            100% { transform: rotate(360deg) translateX(-50%) translateY(-45px); }
-        }
-    `;
-        document.head.appendChild(styleSheet);
     }
 
-
+    // Fonction pour parser la réponse GPT
     function parseGPTResponse(text) {
         const sections = {
             dataCollection: '',
@@ -264,95 +368,119 @@ Policy content:
             privacyAdvice: '',
         };
 
-        const regexMap = {
-            dataCollection: /^1\.\s\*\*Data Collection:\*\*(.*?)^2\./ms,
-            dataSharing: /^2\.\s\*\*Data Sharing:\*\*(.*?)^3\./ms,
-            tracking: /^3\.\s\*\*Tracking:\*\*(.*?)^4\./ms,
-            userRights: /^4\.\s\*\*User Rights:\*\*(.*?)^5\./ms,
-            gdprScore: /^5\.\s\*\*GDPR Score:\*\*(.*?)^6\./ms,
-            privacyAdvice: /^6\.\s\*\*Privacy Advice:\*\*(.*)$/ms,
-        };
+        // Nettoyer le texte des astérisques et formatage markdown
+        const cleanText = text.replace(/\*\*/g, '').replace(/\*/g, '');
 
-        for (const [key, regex] of Object.entries(regexMap)) {
-            const match = text.match(regex);
-            if (match) sections[key] = match[1].trim();
+        // Essayer différents patterns de regex sans les formatages gras
+        const patterns = [
+            {
+                dataCollection: /1\.\s*(?:Data Collection\s*:)?\s*(.*?)(?=2\.|$)/s,
+                dataSharing: /2\.\s*(?:Data Sharing\s*:)?\s*(.*?)(?=3\.|$)/s,
+                tracking: /3\.\s*(?:Tracking\s*:)?\s*(.*?)(?=4\.|$)/s,
+                userRights: /4\.\s*(?:User Rights\s*:)?\s*(.*?)(?=5\.|$)/s,
+                gdprScore: /5\.\s*(?:GDPR Score\s*:)?\s*(.*?)(?=6\.|$)/s,
+                privacyAdvice: /6\.\s*(?:Privacy Advice\s*:)?\s*(.*?)$/s,
+            },
+            {
+                dataCollection: /1\.(.*?)(?=2\.|$)/s,
+                dataSharing: /2\.(.*?)(?=3\.|$)/s,
+                tracking: /3\.(.*?)(?=4\.|$)/s,
+                userRights: /4\.(.*?)(?=5\.|$)/s,
+                gdprScore: /5\.(.*?)(?=6\.|$)/s,
+                privacyAdvice: /6\.(.*?)$/s,
+            }
+        ];
+
+        for (const pattern of patterns) {
+            for (const [key, regex] of Object.entries(pattern)) {
+                if (!sections[key]) {
+                    const match = cleanText.match(regex);
+                    if (match && match[1]) {
+                        sections[key] = match[1].trim().replace(/^-\s*/, '');
+                    }
+                }
+            }
         }
 
+        if (!sections.gdprScore || sections.gdprScore.length < 3) {
+            // Chercher des patterns de score plus spécifiques
+            const scorePatterns = [
+                /Score\s*:?\s*(\d+)(?:\/10)?/i,
+                /(\d+)\/10/,
+                /Score.*?(\d+)/i,
+                /Note.*?(\d+)/i,
+                /Rating.*?(\d+)/i,
+                /Évaluation.*?(\d+)/i,
+                /Confiance.*?(\d+)/i,
+                /Trust.*?(\d+)/i
+            ];
+
+            for (const scorePattern of scorePatterns) {
+                const scoreMatch = cleanText.match(scorePattern);
+                if (scoreMatch && scoreMatch[1]) {
+                    const score = parseInt(scoreMatch[1]);
+                    if (score >= 0 && score <= 10) {
+                        sections.gdprScore = `Score: ${score}/10`;
+                        break;
+                    }
+                }
+            }
+        }
+
+        console.log('Sections parsées:', sections); // Debug
         return sections;
     }
 
-    function deleteAllCookies() {
-        const cookies = document.cookie.split(";");
 
-        for (let cookie of cookies) {
-            const eqPos = cookie.indexOf("=");
-            const name = eqPos > -1 ? cookie.substring(0, eqPos) : cookie;
-            document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
-            document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=" + location.hostname;
-        }
-    }
-
-    function showConfirmation(message) {
-        const msg = document.createElement('div');
-        msg.textContent = message;
-        msg.style.cssText = `
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        background: #22c55e;
-        color: white;
-        padding: 12px 18px;
-        border-radius: 10px;
-        font-size: 14px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        z-index: 999999;
-        animation: fadeInOut 3s ease forwards;
-    `;
-        document.body.appendChild(msg);
-
-        setTimeout(() => msg.remove(), 3000);
-    }
     // Function to show the analysis result in a popup
     async function showAnalysisPopup(gptResponseText) {
+        console.log('Affichage du popup avec:', gptResponseText); // Debug
+
         if (analysisPopup) analysisPopup.remove();
+
+        if (!gptResponseText || gptResponseText.includes('Erreur')) {
+            // Afficher l'erreur
+            const errorPopup = document.createElement('div');
+            errorPopup.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #ff4444;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 99999;
+            max-width: 400px;
+            text-align: center;
+        `;
+            errorPopup.innerHTML = `
+            <h3>Erreur d'analyse</h3>
+            <p>${gptResponseText}</p>
+            <button onclick="this.parentElement.remove()" style="
+                background: white;
+                color: #ff4444;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 5px;
+                margin-top: 15px;
+                cursor: pointer;
+            ">Fermer</button>
+        `;
+            document.body.appendChild(errorPopup);
+            return;
+        }
 
         const parsed = parseGPTResponse(gptResponseText);
 
-        const sections = [{
-                icon: '📥',
-                label: 'Collected data',
-                key: 'dataCollection'
-            },
-            {
-                icon: '🔄',
-                label: 'Data sharing',
-                key: 'dataSharing'
-            },
-            {
-                icon: '🍪',
-                label: 'Tracking',
-                key: 'tracking'
-            },
-            {
-                icon: '🧑‍⚖️',
-                label: 'User rights',
-                key: 'userRights'
-            },
-            {
-                icon: '📊',
-                label: 'GDPR score',
-                key: 'gdprScore'
-            },
-            {
-                icon: '💡',
-                label: 'Privacy advice',
-                key: 'privacyAdvice'
-            },
-            {
-                icon: '📚',
-                label: 'Resources',
-                key: 'resources'
-            }
+        const sections = [
+            { icon: '📥', label: 'Collected data', key: 'dataCollection' },
+            { icon: '🔄', label: 'Data sharing', key: 'dataSharing' },
+            { icon: '🍪', label: 'Tracking', key: 'tracking' },
+            { icon: '🧑‍⚖️', label: 'User rights', key: 'userRights' },
+            { icon: '📊', label: 'GDPR score', key: 'gdprScore' },
+            { icon: '💡', label: 'Privacy advice', key: 'privacyAdvice' },
+            { icon: '📚', label: 'Resources', key: 'resources' }
         ];
 
         const container = document.createElement('div');
@@ -372,12 +500,15 @@ Policy content:
         font-family: system-ui, sans-serif;
     `;
 
-        let isDragging = false,
-            offsetX, offsetY;
+        // Rendre le popup déplaçable
+        let isDragging = false, offsetX, offsetY;
         container.addEventListener('mousedown', (e) => {
-            isDragging = true;
-            offsetX = e.clientX - container.getBoundingClientRect().left;
-            offsetY = e.clientY - container.getBoundingClientRect().top;
+            if (e.target === container || e.target.closest('.sidebar')) {
+                isDragging = true;
+                offsetX = e.clientX - container.getBoundingClientRect().left;
+                offsetY = e.clientY - container.getBoundingClientRect().top;
+                container.style.cursor = 'grabbing';
+            }
         });
         document.addEventListener('mousemove', (e) => {
             if (!isDragging) return;
@@ -386,15 +517,17 @@ Policy content:
         });
         document.addEventListener('mouseup', () => {
             isDragging = false;
+            container.style.cursor = 'default';
         });
 
         const sidebar = document.createElement('div');
+        sidebar.className = 'sidebar';
         sidebar.style.cssText = `
         width: 190px;
         background: #121212;
         border-right: 1px solid #303030;
         display: flex;
-        font-color: #fff;
+        color: #fff;
         flex-direction: column;
         padding: 10px;
     `;
@@ -430,228 +563,226 @@ Policy content:
         exportBtn.addEventListener('mouseout', () => exportBtn.style.background = '#4361ee');
         exportBtn.addEventListener('click', () => generateHTMLReport(gptResponseText));
 
+        // Fonction pour extraire et formater le score GDPR
+        function extractGDPRScore(gdprText) {
+            const scoreMatch = gdprText.match(/Score\s*:?\s*(\d+)(?:\/10)?/i) ||
+                gdprText.match(/(\d+)\/10/) ||
+                gdprText.match(/Score.*?(\d+)/i);
+
+            if (scoreMatch && scoreMatch[1]) {
+                const score = parseInt(scoreMatch[1]);
+                if (score >= 0 && score <= 10) {
+                    return score;
+                }
+            }
+            return null;
+        }
+
+        // Fonction pour obtenir la couleur selon le score
+        function getScoreColor(score) {
+            if (score === null) return '#6b7280';
+            if (score >= 8) return '#10b981'; // Vert
+            if (score >= 6) return '#f59e0b'; // Orange
+            if (score >= 4) return '#f97316'; // Orange foncé
+            return '#ef4444'; // Rouge
+        }
+
+        // Fonction pour obtenir le texte d'évaluation
+        function getScoreText(score) {
+            if (score === null) return 'Non évalué';
+            if (score >= 8) return 'Excellent';
+            if (score >= 6) return 'Correct';
+            if (score >= 4) return 'Préoccupant';
+            return 'Dangereux';
+        }
+
         function renderSection(key, label) {
-            contentArea.innerHTML = '';
-
-            const header = document.createElement('h2');
-            header.textContent = label;
-            header.style.cssText = `
-        margin-top: 0;
-        font-size: 20px;
-        color: #fff;
-        border-bottom: 1px solid #e5e7eb;
-        padding-bottom: 10px;
-        margin-bottom: 20px;
-    `;
-            contentArea.appendChild(header);
-            
-
-
-            const textBlock = document.createElement('div');
-            textBlock.textContent = parsed[key] || '';
-            textBlock.style.cssText = `
-        white-space: pre-wrap;
-        background: #242424;
-        border: 1px solid #303030;
-        border-radius: 10px;
-        padding: 18px;
-        font-size: 15px;
-        line-height: 1.75;
-        color: #d1d5db;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.03);
-        margin-bottom: 25px;
-    `;
-
-
-            contentArea.appendChild(textBlock);
-
-            if (key === 'tracking') {
-
-                const toggleContainer = document.createElement('div');
-                toggleContainer.style.cssText = `
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 25px;
+            contentArea.innerHTML = `
+            <h2 style="
+                margin-top: 0;
+                font-size: 20px;
+                color: #fff;
+                border-bottom: 1px solid #e5e7eb;
+                padding-bottom: 10px;
+                margin-bottom: 20px;
+            ">${label}</h2>
         `;
 
-                const labelEl = document.createElement('label');
-                labelEl.textContent = '🔒 Block cookies';
-                labelEl.style.fontWeight = 'bold';
+            const content = parsed[key] || gptResponseText || 'Aucune information disponible';
 
-                const toggle = document.createElement('input');
-                toggle.type = 'checkbox';
-                toggle.style.display = 'none';
+            if (key === 'gdprScore') {
+                // Rendu spécial pour le score GDPR
+                const score = extractGDPRScore(content);
+                const scoreColor = getScoreColor(score);
+                const scoreText = getScoreText(score);
 
-                const customSwitch = document.createElement('span');
-                customSwitch.style.cssText = `
-            width: 42px;
-            height: 24px;
-            background: #ccc;
-            border-radius: 12px;
-            position: relative;
-            display: inline-block;
-            transition: background 0.3s;
-            cursor: pointer;
-        `;
+                const scoreContainer = document.createElement('div');
+                scoreContainer.style.cssText = `
+                background: #242424;
+                border: 2px solid ${scoreColor};
+                border-radius: 16px;
+                padding: 30px;
+                text-align: center;
+                margin-bottom: 25px;
+                box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+            `;
 
-                const knob = document.createElement('span');
-                knob.style.cssText = `
-            width: 20px;
-            height: 20px;
-            background: white;
-            border-radius: 50%;
-            position: absolute;
-            top: 2px;
-            left: 2px;
-            transition: left 0.3s;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.2);
-        `;
-                customSwitch.appendChild(knob);
+                const scoreDisplay = document.createElement('div');
+                scoreDisplay.style.cssText = `
+                font-size: 72px;
+                font-weight: bold;
+                color: ${scoreColor};
+                margin-bottom: 15px;
+                text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            `;
+                scoreDisplay.textContent = score !== null ? `${score}/10` : 'N/A';
 
-                customSwitch.addEventListener('click', () => {
-                    toggle.checked = !toggle.checked;
+                const scoreLabel = document.createElement('div');
+                scoreLabel.style.cssText = `
+                font-size: 24px;
+                font-weight: 600;
+                color: ${scoreColor};
+                margin-bottom: 20px;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            `;
+                scoreLabel.textContent = scoreText;
 
-                    if (toggle.checked) {
-                        customSwitch.style.background = '#22c55e';
-                        knob.style.left = '20px';
-                        deleteAllCookies();
-                        showConfirmation("Cookies blocked ✅");
-                    } else {
-                        customSwitch.style.background = '#ccc';
-                        knob.style.left = '2px';
-                    }
-                });
+                const scoreExplanation = document.createElement('div');
+                scoreExplanation.style.cssText = `
+                background: #1a1a1a;
+                border-radius: 12px;
+                padding: 20px;
+                margin-top: 20px;
+                border-left: 4px solid ${scoreColor};
+            `;
 
-                toggleContainer.appendChild(labelEl);
-                toggleContainer.appendChild(customSwitch);
-                contentArea.appendChild(toggleContainer);
+                const explanationText = content.replace(/Score\s*:?\s*\d+(?:\/10)?/i, '').trim();
+                scoreExplanation.innerHTML = `
+                <h4 style="color: #fff; margin: 0 0 12px 0; font-size: 16px;">Explication du score :</h4>
+                <p style="color: #d1d5db; margin: 0; line-height: 1.6; font-size: 15px;">${explanationText || 'Aucune explication disponible.'}</p>
+            `;
+
+                scoreContainer.appendChild(scoreDisplay);
+                scoreContainer.appendChild(scoreLabel);
+                scoreContainer.appendChild(scoreExplanation);
+                contentArea.appendChild(scoreContainer);
 
             } else if (key === 'resources') {
-
+                // Section ressources spéciale
                 const title = document.createElement('h2');
                 title.textContent = '🔗 Additional resources';
                 title.style.cssText = `
-        margin-bottom: 16px;
-        font-size: 17px;
-        color: #e2e8f0;
-        border-bottom: 1px solid #3e4c5e;
-        padding-bottom: 8px;
-    `;
+                margin-bottom: 16px;
+                font-size: 17px;
+                color: #e2e8f0;
+                border-bottom: 1px solid #3e4c5e;
+                padding-bottom: 8px;
+            `;
 
                 const grid = document.createElement('div');
                 grid.style.cssText = `
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 16px;
-    `;
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                gap: 16px;
+            `;
 
-                const links = [{
-                        name: 'ShutUpTracker',
-                        url: 'https://shutuptrackers.com',
-                        desc: 'A crowdsourced directory of mobile apps that track users.'
-                    },
-                    {
-                        name: 'Tails',
-                        url: 'https://tails.net/',
-                        desc: 'A live operating system focused on privacy and anonymity.'
-                    },
-                    {
-                        name: 'PrivacyTools',
-                        url: 'https://www.privacytools.io/',
-                        desc: 'A curated list of privacy-focused tools and services.'
-                    },
-                    {
-                        name: 'Privacy Badger',
-                        url: 'https://privacybadger.org/',
-                        desc: 'A browser extension that blocks invisible trackers.'
-                    }
+                const links = [
+                    { name: 'ShutUpTracker', url: 'https://shutuptrackers.com', desc: 'A crowdsourced directory of mobile apps that track users.' },
+                    { name: 'Tails', url: 'https://tails.net/', desc: 'A live operating system focused on privacy and anonymity.' },
+                    { name: 'PrivacyTools', url: 'https://www.privacytools.io/', desc: 'A curated list of privacy-focused tools and services.' },
+                    { name: 'Privacy Badger', url: 'https://privacybadger.org/', desc: 'A browser extension that blocks invisible trackers.' }
                 ];
 
                 links.forEach(link => {
                     const card = document.createElement('div');
                     card.style.cssText = `
-            background: #242424;
-            border: 1px solid #303030;
-            border-radius: 12px;
-            padding: 16px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-            transition: transform 0.2s, box-shadow 0.2s;
-            cursor: pointer;
-        `;
-                    card.addEventListener('mouseenter', () => {
-                        card.style.transform = 'translateY(-2px)';
-                        card.style.boxShadow = '0 6px 16px rgba(0,0,0,0.3)';
-                        card.style.borderColor = '#4cc9f0';
-                    });
-                     const h4 = document.createElement('h4');
-                    h4.style.cssText = 'margin: 0 0 8px; font-size: 15px; color: #4cc9f0;';
-
-                    const a = document.createElement('a');
-                    a.href = link.url;
-                    a.target = '_blank';
-                    a.style.cssText = 'text-decoration: none; color: inherit;';
-                    a.textContent = `${link.name} ↗`;
-
-                    h4.appendChild(a);
-
-                    const p = document.createElement('p');
-                    p.style.cssText = 'margin: 0; font-size: 13px; color: #d1d5db;';
-                    p.textContent = link.desc;
-
-                    card.appendChild(h4);
-                    card.appendChild(p);
+                    background: #242424;
+                    border: 1px solid #303030;
+                    border-radius: 12px;
+                    padding: 16px;
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+                    transition: transform 0.2s, box-shadow 0.2s;
+                    cursor: pointer;
+                `;
+                    card.innerHTML = `
+                    <h4 style="margin: 0 0 8px; font-size: 15px; color: #4cc9f0;">
+                        <a href="${link.url}" target="_blank" style="text-decoration: none; color: inherit;">
+                            ${link.name} ↗
+                        </a>
+                    </h4>
+                    <p style="margin: 0; font-size: 13px; color: #d1d5db;">${link.desc}</p>
+                `;
                     grid.appendChild(card);
                 });
 
-
                 contentArea.appendChild(title);
                 contentArea.appendChild(grid);
+                contentArea.appendChild(exportBtn);
+
+            } else {
+                // Rendu normal pour les autres sections
+                const textBlock = document.createElement('div');
+                textBlock.textContent = content;
+                textBlock.style.cssText = `
+                white-space: pre-wrap;
+                background: #242424;
+                border: 1px solid #303030;
+                border-radius: 10px;
+                padding: 18px;
+                font-size: 15px;
+                line-height: 1.75;
+                color: #d1d5db;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+                margin-bottom: 25px;
+            `;
+                contentArea.appendChild(textBlock);
             }
 
-            contentArea.appendChild(exportBtn);
         }
 
         sections.forEach(({ icon, label, key }) => {
             const btn = document.createElement('button');
+            btn.innerHTML = `${icon} ${label}`;
 
-            const spanIcon = document.createElement('span');
-            spanIcon.textContent = icon;
-
-            const spanLabel = document.createElement('span');
-            spanLabel.textContent = ` ${label}`;
-
-            btn.appendChild(spanIcon);
-            btn.appendChild(spanLabel);
+            // Couleur spéciale pour le bouton GDPR Score
+            let buttonColor = '#e2e8f0';
+            if (key === 'gdprScore') {
+                const score = extractGDPRScore(parsed[key] || '');
+                buttonColor = getScoreColor(score);
+            }
 
             btn.style.cssText = `
-        background: none;
-        border: none;
-        padding: 10px 12px;
-        border-radius: 12px;
-        margin: 4px 0;
-        text-align: left;
-        font-size: 14px;
-        cursor: pointer;
-        color: #e2e8f0;
-        transition: background 0.2s;
-    `;
+            background: none;
+            border: none;
+            padding: 10px 12px;
+            border-radius: 12px;
+            margin: 4px 0;
+            text-align: left;
+            font-size: 14px;
+            cursor: pointer;
+            color: ${buttonColor};
+            transition: background 0.2s;
+        `;
             btn.addEventListener('click', () => renderSection(key, label));
             btn.addEventListener('mouseover', () => btn.style.background = '#303030');
             btn.addEventListener('mouseout', () => btn.style.background = 'none');
             sidebar.appendChild(btn);
         });
 
+
+
+
         const closeBtn = document.createElement('div');
-        closeBtn.textContent = '×';
+        closeBtn.innerHTML = '×';
         closeBtn.style.cssText = `
-    position: absolute;
-    top: 10px;
-    right: 18px;
-    font-size: 24px;
-    color: #777;
-    cursor: pointer;
-`;
+        position: absolute;
+        top: 10px;
+        right: 18px;
+        font-size: 24px;
+        color: #777;
+        cursor: pointer;
+        z-index: 1000; `;
         closeBtn.addEventListener('click', () => container.remove());
 
         container.appendChild(sidebar);
@@ -659,33 +790,22 @@ Policy content:
         container.appendChild(closeBtn);
         document.body.appendChild(container);
 
-        // default section
+        analysisPopup = container;
+
+        // Afficher la première section par défaut
         renderSection(sections[0].key, sections[0].label);
-    }
 
 
-    function getSectionContent(key, parsed) {
-        return `<div style="white-space: pre-wrap;">${parsed[key].trim()}</div>`;
-    }
 
-    // Function to generate HTML report from the analysis result
-    function generateHTMLReport(analysisResult) {
-        const formattedResult = formatResponse(analysisResult);
+        // Function to generate HTML report from the analysis result
+        function generateHTMLReport(analysisResult) {
+            const formattedResult = formatResponse(analysisResult);
 
-        let gdprScore = 'N/A';
-        const gdprRegex = /5\.\s*\*\*GDPR Score:\*\*\s*([0-9\.]+)/i;
-        const scoreMatch = analysisResult.match(gdprRegex);
-        if (scoreMatch && scoreMatch[1]) {
-            gdprScore = scoreMatch[1].trim();
-        } else {
-            const altRegex = /GDPR\s*[Ss]core:?\s*([0-9\.]+)/;
-            const altMatch = analysisResult.match(altRegex);
-            if (altMatch && altMatch[1]) {
-                gdprScore = altMatch[1].trim();
-            }
-        }
+            const score = extractGDPRScore(parsed['gdprScore'] || '');
+            let scoreColor = getScoreColor(score);
+            const scoreText = getScoreText(score);
 
-        const htmlReport = `
+            const htmlReport = `
         <!DOCTYPE html>
         <html lang="en">
         <head>
@@ -706,13 +826,13 @@ Policy content:
                     --box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
                     --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
                 }
-    
+
                 * {
                     margin: 0;
                     padding: 0;
                     box-sizing: border-box;
                 }
-    
+
                 body {
                     font-family: 'Inter', sans-serif;
                     line-height: 1.7;
@@ -724,12 +844,12 @@ Policy content:
                     flex-direction: column;
                     align-items: center;
                 }
-    
+
                 .container {
                     max-width: 900px;
                     width: 100%;
                 }
-    
+
                 header {
                     text-align: center;
                     margin-bottom: 40px;
@@ -737,7 +857,7 @@ Policy content:
                     border-bottom: 2px solid var(--primary-light);
                     width: 100%;
                 }
-    
+
                 h1 {
                     color: var(--primary-color);
                     font-size: 2.5rem;
@@ -748,20 +868,20 @@ Policy content:
                     background-clip: text;
                     color: transparent;
                 }
-    
+
                 .subtitle {
                     color: var(--light-text);
                     font-size: 1.1rem;
                     font-weight: 400;
                 }
-    
+
                 .report-grid {
                     display: grid;
                     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
                     gap: 25px;
                     width: 100%;
                 }
-    
+
                 .report-card {
                     background-color: var(--card-bg);
                     padding: 30px;
@@ -770,12 +890,12 @@ Policy content:
                     transition: var(--transition);
                     border: 1px solid rgba(0, 0, 0, 0.05);
                 }
-    
+
                 .report-card:hover {
                     transform: translateY(-5px);
                     box-shadow: 0 15px 35px rgba(0, 0, 0, 0.12);
                 }
-    
+
                 .report-card h3 {
                     color: var(--primary-color);
                     margin-bottom: 15px;
@@ -786,7 +906,7 @@ Policy content:
                     display: flex;
                     align-items: center;
                 }
-    
+
                 .report-card h3::before {
                     content: "";
                     display: inline-block;
@@ -796,14 +916,14 @@ Policy content:
                     background-color: var(--primary-light);
                     margin-right: 10px;
                 }
-    
+
                 .report-card p {
                     color: var(--text-color);
                     font-size: 1rem;
                     line-height: 1.8;
                     margin-bottom: 15px;
                 }
-    
+
                 .gdpr-score-container {
                     display: flex;
                     flex-direction: column;
@@ -811,22 +931,59 @@ Policy content:
                     justify-content: center;
                     text-align: center;
                     padding: 20px;
+                    position: relative;
                 }
-    
+
                 .gdpr-score {
-                    font-size: 2.5rem;
+                    font-size: 3rem;
                     font-weight: 700;
-                    color: var(--primary-color);
-                    margin: 10px 0;
+                    margin: 15px 0;
+                    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
                 }
-    
+
                 .score-label {
                     color: var(--light-text);
                     font-size: 0.9rem;
                     text-transform: uppercase;
                     letter-spacing: 1px;
+                    margin-bottom: 10px;
                 }
-    
+
+                .score-text {
+                    font-size: 1.2rem;
+                    font-weight: 600;
+                    padding: 8px 16px;
+                    border-radius: 20px;
+                    color: white;
+                    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+                    margin-top: 10px;
+                }
+
+                .score-circle {
+                    width: 120px;
+                    height: 120px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin: 10px auto;
+                    border: 4px solid;
+                    position: relative;
+                    overflow: hidden;
+                }
+
+                .score-circle::before {
+                    content: '';
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: inherit;
+                    opacity: 0.1;
+                    border-radius: 50%;
+                }
+
                 .advice {
                     font-style: italic;
                     color: var(--light-text);
@@ -835,29 +992,38 @@ Policy content:
                     border-radius: var(--border-radius);
                     border-left: 4px solid var(--primary-light);
                 }
-    
+
                 .full-width-card {
                     grid-column: 1 / -1;
                 }
-    
+
                 @media (max-width: 768px) {
                     body {
                         padding: 20px;
                     }
-    
+
                     .report-grid {
                         grid-template-columns: 1fr;
                     }
-    
+
                     h1 {
                         font-size: 2rem;
                     }
-    
+
                     .full-width-card {
                         grid-column: auto;
                     }
+
+                    .gdpr-score {
+                        font-size: 2.5rem;
+                    }
+
+                    .score-circle {
+                        width: 100px;
+                        height: 100px;
+                    }
                 }
-    
+
                 .floating-icon {
                     position: fixed;
                     bottom: 30px;
@@ -876,7 +1042,7 @@ Policy content:
                     transition: var(--transition);
                     z-index: 100;
                 }
-    
+
                 .floating-icon:hover {
                     transform: scale(1.1);
                     background-color: var(--primary-dark);
@@ -889,111 +1055,159 @@ Policy content:
                     <h1>Consent Watcher - Privacy Policy Analysis</h1>
                     <p class="subtitle">Comprehensive report on data handling practices</p>
                 </header>
-    
+
                 <div class="report-grid">
                     <div class="report-card">
                         <h3>Data Collection</h3>
                         <p>${formattedResult.split('<br>1. ')[1]?.split('<br>2. ')[0] || 'N/A'}</p>
                     </div>
-    
+
                     <div class="report-card">
                         <h3>Data Sharing</h3>
                         <p>${formattedResult.split('<br>2. ')[1]?.split('<br>3. ')[0] || 'N/A'}</p>
                     </div>
-    
+
                     <div class="report-card">
                         <h3>Tracking</h3>
                         <p>${formattedResult.split('<br>3. ')[1]?.split('<br>4. ')[0] || 'N/A'}</p>
                     </div>
-    
+
                     <div class="report-card">
                         <h3>User Rights</h3>
                         <p>${formattedResult.split('<br>4. ')[1]?.split('<br>5. ')[0] || 'N/A'}</p>
                     </div>
-    
+
                     <div class="report-card full-width-card">
                         <div class="gdpr-score-container">
                             <h3>GDPR Compliance</h3>
-                            <div class="gdpr-score">${gdprScore !== 'N/A' ? gdprScore : 'N/A'}</div>
                             <span class="score-label">Trust Score</span>
+                            
+                            <div class="score-circle" style="border-color: ${scoreColor}; color: ${scoreColor};">
+                                <div class="gdpr-score">${score !== null ? score.toFixed(1) : 'N/A'}</div>
+                            </div>
+                            
+                            <div class="score-text" style="background-color: ${scoreColor};">
+                                ${scoreText}
+                            </div>
                         </div>
                     </div>
-    
+
                     <div class="report-card full-width-card">
                         <h3 id="advices">Privacy Advice</h3>
                         <p class="advice">${formattedResult.split('<br>6. ')[1] || 'N/A'}</p>
                     </div>
                 </div>
             </div>
-    
-            <div class="floating-icon" title="Download Report" onclick="document.getElementById('advices').scrollIntoView({ behavior: 'smooth' });">
-                     ↓
-                    </div>
+
+            <div class="floating-icon" title="Scroll to Advice" onclick="document.getElementById('advices').scrollIntoView({ behavior: 'smooth' });">
+                ↓
+            </div>
         </body>
         </html>
         `;
 
-        const blob = new Blob([htmlReport], {
-            type: 'text/html'
-        });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'privacy_analysis_report.html';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
-
-    // Function to show a loading popup while analyzing
-    async function runAnalysis() {
-        const text = extractVisibleText();
-        if (text.length < 1000) {
-            console.log("Not enough text for a useful analysis.");
-            return;
+            const blob = new Blob([htmlReport], {
+                type: 'text/html'
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'privacy_analysis_report.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
 
-        showLoadingPopup();
-        const result = await analyzePolicy(text);
-        showAnalysisPopup(result);
+
+
+
+
+
     }
 
-    // Create the action button when the script loads
-    createActionButton();
 
-    // Add CSS styles for the popup and button
+    // Function to format the response for better readability
+    function formatResponse(responseText) {
+        let formattedText = responseText.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+        formattedText = formattedText.replace(/(\d+\.)/g, '<br>$1');
+        formattedText = formattedText.replace(/-/g, '<br>-');
+        return formattedText;
+    }
+
+
+    // Main analysis function
+    async function runAnalysis() {
+        try {
+            console.log('Début de l\'analyse...'); // Debug
+
+            // Vérifier la configuration
+            if (!currentConfig.apiKey) {
+                console.error('Configuration manquante:', currentConfig);
+                showAnalysisPopup('Erreur: Clé API non configurée. Veuillez configurer votre clé API dans les paramètres de l\'extension.');
+                return;
+            }
+
+            showLoadingPopup();
+
+            // Extraire le texte de la page
+            const policyText = extractVisibleText();
+            console.log('Longueur du texte extrait:', policyText.length); // Debug
+
+            if (!policyText || policyText.length < 100) {
+                console.log('Pas assez de texte trouvé');
+                showAnalysisPopup('❌ Aucune politique de confidentialité détectée sur cette page ou contenu insuffisant.');
+                return;
+            }
+
+            console.log('Appel de l\'API...'); // Debug
+            const analysis = await analyzePolicy(policyText);
+            console.log('Analyse terminée:', analysis); // Debug
+
+            showAnalysisPopup(analysis);
+
+        } catch (error) {
+            console.error('Erreur lors de l\'analyse:', error);
+            showAnalysisPopup('❌ Erreur lors de l\'analyse. Veuillez réessayer.');
+        }
+    }
+
+    // Initialize when page loads
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', createActionButton);
+    } else {
+        createActionButton();
+    }
+
+    // Add CSS styles for animations
     const styleEnhancer = document.createElement("style");
-    styleEnhancer.textContent = `
-@keyframes fadeInScale {
-    0% { opacity: 0; transform: scale(0.9); }
-    100% { opacity: 1; transform: scale(1); }
-}
+    styleEnhancer.innerHTML = `
+        @keyframes fadeInScale {
+            0% { opacity: 0; transform: scale(0.9); }
+            100% { opacity: 1; transform: scale(1); }
+        }
 
-button:hover {
-    transition: all 0.3s ease;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(76, 175, 80, 0.3);
-}
+        @keyframes ripple {
+            to { transform: scale(4); opacity: 0; }
+        }
 
-div.analysis-popup, div.loading-popup {
-    animation: fadeInScale 0.4s ease-out;
-    backdrop-filter: blur(12px);
-    background: rgba(255, 255, 255, 0.75);
-    border: 1px solid rgba(200, 200, 200, 0.3);
-}
+        button:hover {
+            transition: all 0.3s ease;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(67, 97, 238, 0.3);
+        }
 
-::-webkit-scrollbar {
-    width: 8px;
-}
-::-webkit-scrollbar-thumb {
-    background-color: ${primaryLightColor};
-    border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-    background-color: ${primaryColor};
-}
-`;
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: ${primaryLightColor};
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background-color: ${primaryColor};
+        }
+    `;
     document.head.appendChild(styleEnhancer);
 
 })();
