@@ -19,11 +19,80 @@
         apiKey: ''
     };
 
+    function Showerror(errormessage) {
+        const errorPopup = document.createElement('div');
+        errorPopup.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: #ff4444;
+        color: white;
+        padding: 20px;
+        border-radius: 10px;
+        z-index: 99999;
+        max-width: 400px;
+        text-align: center;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    `;
+
+        // Create elements safely without innerHTML
+        const title = document.createElement('h3');
+        title.style.cssText = 'margin: 0 0 15px 0;';
+        title.textContent = 'Analysis error'; // Safe text assignment
+
+        const message = document.createElement('p');
+        message.style.cssText = 'margin: 0 0 20px 0;';
+        message.textContent = errormessage; // Safe text assignment - prevents XSS
+
+        const closeBtn = document.createElement('button');
+        closeBtn.id = 'closeErrorBtn';
+        closeBtn.style.cssText = `
+        background: white;
+        color: #ff4444;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: bold;
+        transition: background-color 0.2s;
+    `;
+        closeBtn.textContent = 'Fermer'; // Safe text assignment
+
+        // Append elements to popup
+        errorPopup.appendChild(title);
+        errorPopup.appendChild(message);
+        errorPopup.appendChild(closeBtn);
+
+        document.body.appendChild(errorPopup);
+
+        // Event listeners
+        closeBtn.addEventListener('click', function () {
+            errorPopup.remove();
+        });
+
+        // Hover effects
+        closeBtn.addEventListener('mouseenter', function () {
+            this.style.backgroundColor = '#f0f0f0';
+        });
+
+        closeBtn.addEventListener('mouseleave', function () {
+            this.style.backgroundColor = 'white';
+        });
+
+        // Auto-close after 10 seconds
+        setTimeout(() => {
+            if (document.body.contains(errorPopup)) {
+                errorPopup.remove();
+            }
+        }, 10000);
+    }
+
     // Charger la configuration depuis le storage
     function loadConfig() {
         return new Promise((resolve) => {
             chrome.storage.local.get(['selectedAI', 'selectedModel', 'apiKeys'], (result) => {
-                console.log('Configuration chargée:', result); // Debug
+                console.log('Configuration loaded:', result); // Debug
                 if (result.selectedAI && result.selectedModel && result.apiKeys) {
                     currentConfig = {
                         selectedAI: result.selectedAI,
@@ -31,7 +100,7 @@
                         apiKey: result.apiKeys[result.selectedAI] || ''
                     };
                 }
-                console.log('Config actuelle:', currentConfig); // Debug
+                console.log('Current config:', currentConfig); // Debug
                 resolve(currentConfig);
             });
         });
@@ -58,21 +127,6 @@
         button.addEventListener('mouseover', () => button.style.backgroundColor = primaryLightColor);
         button.addEventListener('mouseout', () => button.style.backgroundColor = primaryColor);
         button.addEventListener('click', async (e) => {
-            // Effet ripple
-            const circle = document.createElement("span");
-            circle.style.position = "absolute";
-            circle.style.borderRadius = "50%";
-            circle.style.transform = "scale(0)";
-            circle.style.animation = "ripple 600ms linear";
-            circle.style.backgroundColor = "rgba(255, 255, 255, 0.7)";
-            circle.style.pointerEvents = "none";
-            const rect = button.getBoundingClientRect();
-            circle.style.left = `${e.clientX - rect.left}px`;
-            circle.style.top = `${e.clientY - rect.top}px`;
-            circle.style.width = circle.style.height = "100px";
-            button.appendChild(circle);
-            setTimeout(() => circle.remove(), 600);
-
             // Charger la config et lancer l'analyse
             await loadConfig();
             runAnalysis();
@@ -147,25 +201,21 @@
     // Extraire la réponse selon l'IA
     function extractResponse(response, aiService) {
         try {
-            console.log('Réponse brute de l\'API:', response); // Debug
-
+            console.log('Raw API response:', response); // Debug
             switch (aiService) {
                 case 'openai':
                 case 'grok':
-                    return response.choices?.[0]?.message?.content || 'Erreur lors de l\'analyse.';
-
+                    return response.choices?.[0]?.message?.content || 'Error during analysis.';
                 case 'claude':
-                    return response.content?.[0]?.text || 'Erreur lors de l\'analyse.';
-
+                    return response.content?.[0]?.text || 'Error during analysis.';
                 case 'gemini':
-                    return response.candidates?.[0]?.content?.parts?.[0]?.text || 'Erreur lors de l\'analyse.';
-
+                    return response.candidates?.[0]?.content?.parts?.[0]?.text || 'Error during analysis.';
                 default:
-                    return response.choices?.[0]?.message?.content || 'Erreur lors de l\'analyse.';
+                    return response.choices?.[0]?.message?.content || 'Error during analysis.';
             }
         } catch (error) {
-            console.error('Erreur lors de l\'extraction de la réponse:', error);
-            return 'Erreur lors de l\'analyse de la réponse.';
+            console.error('Error extracting response:', error);
+            return 'Error analyzing response.';
         }
     }
 
@@ -179,26 +229,30 @@
         }
 
         const prompt = `
-You are a privacy assistant. Analyze the following privacy policy and provide concise answers to these questions, making sure each point starts on a new line:
+You are a privacy assistant. Analyze the following text and try to extract privacy-related information.
 
-1. What types of personal data are collected? (e.g., name, email, browsing history)
+ONLY respond with "NOT_PRIVACY_POLICY" if the text is clearly unrelated to privacy (like a product page, contact page, or completely different content) AND contains absolutely no privacy information.
 
-2. Is personal data shared with third parties? If yes, with whom and for what purpose?
+Be flexible and accommodating - if you find ANY privacy-related content (even if incomplete), provide an analysis. This includes:
+- Partial privacy policies
+- Pages with some privacy information mixed with other content  
+- Cookie notices or privacy banners
+- Terms that mention data handling
+- Any mention of data collection, cookies, or user information
 
-3. Are cookies or other tracking technologies used? If yes, for what purposes?
-
-4. What rights do users have regarding their data? (e.g., access, deletion, rectification)
-
-5. IMPORTANT - Provide a numerical score from 0 to 10 (where 10 is fully compliant and trustworthy). Format: Score: X/10 with explanation.
-
-6. Provide one key practical privacy advice for the user of this website.
-
+If you find any privacy-related content, analyze it and provide detailed but concise answers to these questions, making sure each point starts on a new line with the right number without the question :
+1. What types of personal data are collected? (e.g., name, email, browsing history) - Include specific examples and explain how this data is gathered. If unclear, state "Information not clearly specified in the available text."
+2. Is personal data shared with third parties? If yes, with whom and for what purpose? - Specify the types of partners and the reasons for sharing. If unclear, state "Third-party sharing details not clearly specified."
+3. Are cookies or other tracking technologies used? If yes, for what purposes? - Explain the different types of tracking and their specific uses. If unclear, state "Cookie usage details not clearly specified."
+4. What rights do users have regarding their data? (e.g., access, deletion, rectification) - Detail the process for exercising these rights and any limitations. If unclear, state "User rights not clearly specified."
+5. IMPORTANT - Provide a numerical score from 0 to 10 (where 10 is fully compliant and trustworthy). Format: Score: X/10 with a brief explanation covering transparency, user control, and compliance with privacy regulations.
+6. Provide one key practical privacy advice for the user of this website - Give actionable guidance specific to this privacy policy.
 IMPORTANT: For the score (point 5), respond EXACTLY in this format: "Score: X/10" where X is a number from 0 to 10.
 Format your response with simple text, no markdown formatting. Make sure each numbered point starts on a new line.
 `;
 
         const policyContent = `
-Policy content:
+Text to analyze:
 """${text.slice(0, 8000)}"""
 `;
 
@@ -214,62 +268,29 @@ Policy content:
                 body: JSON.stringify(payload),
                 apiKey: currentConfig.apiKey
             }, (response) => {
-                console.log('Réponse reçue du background:', response); // Debug
-
+                console.log('Response received from background:', response); // Debug
                 if (chrome.runtime.lastError) {
-                    console.error('Erreur runtime:', chrome.runtime.lastError);
-                    resolve('Erreur de communication avec l\'extension.');
+                    console.error('Runtime error:', chrome.runtime.lastError);
+                    resolve('Communication error with extension.');
                     return;
                 }
-
                 if (!response) {
-                    console.error('Pas de réponse du background script');
-                    resolve('Erreur: Pas de réponse du serveur.');
+                    console.error('No response from background script');
+                    resolve('Error: No response from server.');
                     return;
                 }
-
                 if (response.error) {
-                    console.error('Erreur API:', response.error);
-                    resolve(`Erreur API: ${response.error}`);
+                    console.error('API error:', response.error);
+                    resolve(`API Error: ${response.error}`);
                     return;
                 }
-
                 const result = extractResponse(response, currentConfig.selectedAI);
-                console.log('Résultat extrait:', result); // Debug
+                console.log('Extracted result:', result); // Debug
                 resolve(result);
             });
         });
     }
 
-    // Function to extract privacy policy text from the page
-    function extractPrivacyPolicyText() {
-        const selectors = [
-            '[data-testid*="privacy"]',
-            '[class*="privacy"]',
-            '[id*="privacy"]',
-            'main',
-            'article',
-            '.content',
-            '#content',
-            'body'
-        ];
-
-        for (const selector of selectors) {
-            const element = document.querySelector(selector);
-            if (element) {
-                let text = element.innerText || element.textContent || '';
-                text = text.replace(/\s+/g, ' ').trim();
-                if (text.length > 500) {
-                    console.log(`Texte extrait avec le sélecteur ${selector}:`, text.slice(0, 200) + '...'); // Debug
-                    return text;
-                }
-            }
-        }
-
-        const bodyText = document.body.innerText || document.body.textContent || '';
-        console.log('Texte du body:', bodyText.slice(0, 200) + '...'); // Debug
-        return bodyText;
-    }
 
     // Function to extract visible text from the page
     function extractVisibleText() {
@@ -416,7 +437,7 @@ Policy content:
             ];
 
             for (const scorePattern of scorePatterns) {
-                const scoreMatch = cleanText.match(scorePattern);
+                const scoreMatch = cleanText.match(scorePattern)
                 if (scoreMatch && scoreMatch[1]) {
                     const score = parseInt(scoreMatch[1]);
                     if (score >= 0 && score <= 10) {
@@ -432,6 +453,8 @@ Policy content:
     }
 
 
+
+
     // Function to show the analysis result in a popup
     async function showAnalysisPopup(gptResponseText) {
         console.log('Affichage du popup avec:', gptResponseText); // Debug
@@ -440,35 +463,39 @@ Policy content:
 
         if (!gptResponseText || gptResponseText.includes('Erreur')) {
             // Afficher l'erreur
-            const errorPopup = document.createElement('div');
-            errorPopup.style.cssText = `
+            Showerror(gptResponseText);
+            return 0;
+        }
+
+        // Cookie blocking function
+        function deleteAllCookies() {
+            const cookies = document.cookie.split(";");
+            for (let cookie of cookies) {
+                const eqPos = cookie.indexOf("=");
+                const name = eqPos > -1 ? cookie.substring(0, eqPos) : cookie;
+                document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+                document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=" + location.hostname;
+            }
+        }
+
+        // Confirmation message function
+        function showConfirmation(message) {
+            const confirmation = document.createElement('div');
+            confirmation.textContent = message;
+            confirmation.style.cssText = `
             position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: #ff4444;
+            top: 20px;
+            right: 20px;
+            background: #22c55e;
             color: white;
-            padding: 20px;
-            border-radius: 10px;
-            z-index: 99999;
-            max-width: 400px;
-            text-align: center;
+            padding: 12px 20px;
+            border-radius: 8px;
+            z-index: 100000;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         `;
-            errorPopup.innerHTML = `
-            <h3>Erreur d'analyse</h3>
-            <p>${gptResponseText}</p>
-            <button onclick="this.parentElement.remove()" style="
-                background: white;
-                color: #ff4444;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 5px;
-                margin-top: 15px;
-                cursor: pointer;
-            ">Fermer</button>
-        `;
-            document.body.appendChild(errorPopup);
-            return;
+            document.body.appendChild(confirmation);
+            setTimeout(() => confirmation.remove(), 3000);
         }
 
         const parsed = parseGPTResponse(gptResponseText);
@@ -589,84 +616,188 @@ Policy content:
 
         // Fonction pour obtenir le texte d'évaluation
         function getScoreText(score) {
-            if (score === null) return 'Non évalué';
+            if (score === null) return 'Not evaluated';
             if (score >= 8) return 'Excellent';
-            if (score >= 6) return 'Correct';
-            if (score >= 4) return 'Préoccupant';
-            return 'Dangereux';
+            if (score >= 6) return 'Good';
+            if (score >= 4) return 'Concerning';
+            return 'Dangerous';
         }
 
         function renderSection(key, label) {
             contentArea.innerHTML = `
-            <h2 style="
-                margin-top: 0;
-                font-size: 20px;
-                color: #fff;
-                border-bottom: 1px solid #e5e7eb;
-                padding-bottom: 10px;
-                margin-bottom: 20px;
-            ">${label}</h2>
-        `;
+        <h2 style="
+            margin-top: 0;
+            font-size: 20px;
+            color: #fff;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        "></h2>
+    `;
+            // Safely set the text content
+            contentArea.querySelector('h2').textContent = label;
 
             const content = parsed[key] || gptResponseText || 'Aucune information disponible';
 
-            if (key === 'gdprScore') {
+            if (key === 'tracking') {
+                // Section tracking avec bouton de blocage des cookies
+                const toggleContainer = document.createElement('div');
+                toggleContainer.style.cssText = `
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                margin-bottom: 25px;
+                background: #242424;
+                border: 1px solid #303030;
+                border-radius: 12px;
+                padding: 20px;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            `;
+
+                const labelEl = document.createElement('label');
+                labelEl.textContent = '🔒 Block cookies';
+                labelEl.style.cssText = `
+                font-weight: bold;
+                color: #e2e8f0;
+                font-size: 16px;
+            `;
+
+                const toggle = document.createElement('input');
+                toggle.type = 'checkbox';
+                toggle.style.display = 'none';
+
+                const customSwitch = document.createElement('span');
+                customSwitch.style.cssText = `
+                width: 42px;
+                height: 24px;
+                background: #ccc;
+                border-radius: 12px;
+                position: relative;
+                display: inline-block;
+                transition: background 0.3s;
+                cursor: pointer;
+            `;
+
+                const knob = document.createElement('span');
+                knob.style.cssText = `
+                width: 20px;
+                height: 20px;
+                background: white;
+                border-radius: 50%;
+                position: absolute;
+                top: 2px;
+                left: 2px;
+                transition: left 0.3s;
+                box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+            `;
+
+                customSwitch.appendChild(knob);
+                customSwitch.addEventListener('click', () => {
+                    toggle.checked = !toggle.checked;
+                    if (toggle.checked) {
+                        customSwitch.style.background = '#22c55e';
+                        knob.style.left = '20px';
+                        deleteAllCookies();
+                        showConfirmation("Cookies blocked ✅");
+                    } else {
+                        customSwitch.style.background = '#ccc';
+                        knob.style.left = '2px';
+                    }
+                });
+
+                toggleContainer.appendChild(labelEl);
+                toggleContainer.appendChild(customSwitch);
+                contentArea.appendChild(toggleContainer);
+
+                // Afficher le contenu de tracking
+                const textBlock = document.createElement('div');
+                textBlock.textContent = content;
+                textBlock.style.cssText = `
+                white-space: pre-wrap;
+                background: #242424;
+                border: 1px solid #303030;
+                border-radius: 10px;
+                padding: 18px;
+                font-size: 15px;
+                line-height: 1.75;
+                color: #d1d5db;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+                margin-bottom: 25px;
+            `;
+                contentArea.appendChild(textBlock);
+
+            } else if (key === 'gdprScore') {
                 // Rendu spécial pour le score GDPR
                 const score = extractGDPRScore(content);
                 const scoreColor = getScoreColor(score);
                 const scoreText = getScoreText(score);
-
                 const scoreContainer = document.createElement('div');
                 scoreContainer.style.cssText = `
-                background: #242424;
-                border: 2px solid ${scoreColor};
-                border-radius: 16px;
-                padding: 30px;
-                text-align: center;
-                margin-bottom: 25px;
-                box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-            `;
+        background: #242424;
+        border: 2px solid ${scoreColor};
+        border-radius: 16px;
+        padding: 30px;
+        text-align: center;
+        margin-bottom: 25px;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    `;
 
                 const scoreDisplay = document.createElement('div');
                 scoreDisplay.style.cssText = `
-                font-size: 72px;
-                font-weight: bold;
-                color: ${scoreColor};
-                margin-bottom: 15px;
-                text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            `;
+        font-size: 72px;
+        font-weight: bold;
+        color: ${scoreColor};
+        margin-bottom: 15px;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    `;
                 scoreDisplay.textContent = score !== null ? `${score}/10` : 'N/A';
 
                 const scoreLabel = document.createElement('div');
                 scoreLabel.style.cssText = `
-                font-size: 24px;
-                font-weight: 600;
-                color: ${scoreColor};
-                margin-bottom: 20px;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-            `;
+        font-size: 24px;
+        font-weight: 600;
+        color: ${scoreColor};
+        margin-bottom: 20px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    `;
                 scoreLabel.textContent = scoreText;
 
                 const scoreExplanation = document.createElement('div');
                 scoreExplanation.style.cssText = `
-                background: #1a1a1a;
-                border-radius: 12px;
-                padding: 20px;
-                margin-top: 20px;
-                border-left: 4px solid ${scoreColor};
-            `;
+        background: #1a1a1a;
+        border-radius: 12px;
+        padding: 20px;
+        margin-top: 20px;
+        border-left: 4px solid ${scoreColor};
+    `;
+
+                // Fonction de sanitisation simple
+                function sanitizeHTML(str) {
+                    const div = document.createElement('div');
+                    div.textContent = str;
+                    return div.innerHTML;
+                }
+
+                // Création sécurisée du contenu de l'explication
+                const explanationTitle = document.createElement('h4');
+                explanationTitle.style.cssText = 'color: #fff; margin: 0 0 12px 0; font-size: 16px;';
+                explanationTitle.textContent = 'Explication du score :';
+
+                const explanationParagraph = document.createElement('p');
+                explanationParagraph.style.cssText = 'color: #d1d5db; margin: 0; line-height: 1.6; font-size: 15px;';
 
                 const explanationText = content.replace(/Score\s*:?\s*\d+(?:\/10)?/i, '').trim();
-                scoreExplanation.innerHTML = `
-                <h4 style="color: #fff; margin: 0 0 12px 0; font-size: 16px;">Explication du score :</h4>
-                <p style="color: #d1d5db; margin: 0; line-height: 1.6; font-size: 15px;">${explanationText || 'Aucune explication disponible.'}</p>
-            `;
+                explanationParagraph.textContent = explanationText || 'Aucune explication disponible.';
+
+                scoreExplanation.appendChild(explanationTitle);
+                scoreExplanation.appendChild(explanationParagraph);
 
                 scoreContainer.appendChild(scoreDisplay);
                 scoreContainer.appendChild(scoreLabel);
                 scoreContainer.appendChild(scoreExplanation);
                 contentArea.appendChild(scoreContainer);
+
 
             } else if (key === 'resources') {
                 // Section ressources spéciale
@@ -705,14 +836,28 @@ Policy content:
                     transition: transform 0.2s, box-shadow 0.2s;
                     cursor: pointer;
                 `;
-                    card.innerHTML = `
-                    <h4 style="margin: 0 0 8px; font-size: 15px; color: #4cc9f0;">
-                        <a href="${link.url}" target="_blank" style="text-decoration: none; color: inherit;">
-                            ${link.name} ↗
-                        </a>
-                    </h4>
-                    <p style="margin: 0; font-size: 13px; color: #d1d5db;">${link.desc}</p>
-                `;
+                    // Clear any existing content
+                    card.innerHTML = '';
+
+                    // Create the heading and link
+                    const h4 = document.createElement('h4');
+                    h4.style.cssText = 'margin: 0 0 8px; font-size: 15px; color: #4cc9f0;';
+
+                    const a = document.createElement('a');
+                    a.href = link.url; // Browsers automatically sanitize href
+                    a.target = '_blank';
+                    a.style.cssText = 'text-decoration: none; color: inherit;';
+                    a.textContent = `${link.name} ↗`; // Safe text content
+
+                    // Create the description paragraph
+                    const p = document.createElement('p');
+                    p.style.cssText = 'margin: 0; font-size: 13px; color: #d1d5db;';
+                    p.textContent = link.desc; // Safe text content
+
+                    // Assemble the elements
+                    h4.appendChild(a);
+                    card.appendChild(h4);
+                    card.appendChild(p);
                     grid.appendChild(card);
                 });
 
@@ -738,12 +883,11 @@ Policy content:
             `;
                 contentArea.appendChild(textBlock);
             }
-
         }
 
         sections.forEach(({ icon, label, key }) => {
             const btn = document.createElement('button');
-            btn.innerHTML = `${icon} ${label}`;
+            btn.textContent = `${icon} ${label}`; // Safe text assignment
 
             // Couleur spéciale pour le bouton GDPR Score
             let buttonColor = '#e2e8f0';
@@ -753,25 +897,23 @@ Policy content:
             }
 
             btn.style.cssText = `
-            background: none;
-            border: none;
-            padding: 10px 12px;
-            border-radius: 12px;
-            margin: 4px 0;
-            text-align: left;
-            font-size: 14px;
-            cursor: pointer;
-            color: ${buttonColor};
-            transition: background 0.2s;
-        `;
+        background: none;
+        border: none;
+        padding: 10px 12px;
+        border-radius: 12px;
+        margin: 4px 0;
+        text-align: left;
+        font-size: 14px;
+        cursor: pointer;
+        color: ${buttonColor};
+        transition: background 0.2s;
+    `;
+
             btn.addEventListener('click', () => renderSection(key, label));
             btn.addEventListener('mouseover', () => btn.style.background = '#303030');
             btn.addEventListener('mouseout', () => btn.style.background = 'none');
             sidebar.appendChild(btn);
         });
-
-
-
 
         const closeBtn = document.createElement('div');
         closeBtn.innerHTML = '×';
@@ -782,7 +924,8 @@ Policy content:
         font-size: 24px;
         color: #777;
         cursor: pointer;
-        z-index: 1000; `;
+        z-index: 1000;
+    `;
         closeBtn.addEventListener('click', () => container.remove());
 
         container.appendChild(sidebar);
@@ -794,6 +937,7 @@ Policy content:
 
         // Afficher la première section par défaut
         renderSection(sections[0].key, sections[0].label);
+
 
 
 
@@ -1120,10 +1264,6 @@ Policy content:
         }
 
 
-
-
-
-
     }
 
 
@@ -1136,39 +1276,246 @@ Policy content:
     }
 
 
-    // Main analysis function
+
+    // Function to extract privacy policy text from the page
+    function extractPrivacyPolicyText() {
+        const selectors = [
+            '[data-testid*="privacy"]',
+            '[class*="privacy"]',
+            '[id*="privacy"]',
+            'main',
+            'article',
+            '.content',
+            '#content',
+            'body'
+        ];
+
+        for (const selector of selectors) {
+            const element = document.querySelector(selector);
+            if (element) {
+                let text = element.innerText || element.textContent || '';
+                text = text.replace(/\s+/g, ' ').trim();
+                if (text.length > 500) {
+                    console.log(`Texte extrait avec le sélecteur ${selector}:`, text.slice(0, 200) + '...'); // Debug
+                    return text;
+                }
+            }
+        }
+
+        const bodyText = document.body.innerText || document.body.textContent || '';
+        console.log('Texte du body:', bodyText.slice(0, 200) + '...'); // Debug
+        return bodyText;
+    }
+
+    // Fonction pour vérifier si la réponse de l'IA indique l'absence de politique de confidentialité
+    function isNotPrivacyPolicyResponse(response) {
+        // Ne vérifier que la réponse exacte pour éviter les faux positifs
+        return response.trim() === 'NOT_PRIVACY_POLICY';
+    }
+
     async function runAnalysis() {
         try {
             console.log('Début de l\'analyse...'); // Debug
 
             // Vérifier la configuration
             if (!currentConfig.apiKey) {
-                console.error('Configuration manquante:', currentConfig);
-                showAnalysisPopup('Erreur: Clé API non configurée. Veuillez configurer votre clé API dans les paramètres de l\'extension.');
+                console.error('Missing configuration:', currentConfig);
+                Showerror('Error: API key not configured. Please configure your API key in the extension settings.');
                 return;
             }
 
             showLoadingPopup();
 
-            // Extraire le texte de la page
-            const policyText = extractVisibleText();
+            // Extraire le texte de la page actuelle
+            let policyText = extractVisibleText();
             console.log('Longueur du texte extrait:', policyText.length); // Debug
 
-            if (!policyText || policyText.length < 100) {
-                console.log('Pas assez de texte trouvé');
-                showAnalysisPopup('❌ Aucune politique de confidentialité détectée sur cette page ou contenu insuffisant.');
-                return;
+            // Analyser le texte avec l'IA
+            console.log('Appel de l\'API pour analyse initiale...'); // Debug
+            const initialAnalysis = await analyzePolicy(policyText);
+            console.log('Analyse initiale terminée:', initialAnalysis); // Debug
+
+            // Vérifier si l'IA indique que ce n'est pas une politique de confidentialité
+            if (isNotPrivacyPolicyResponse(initialAnalysis)) {
+                console.log('L\'IA indique clairement que ce n\'est pas du contenu lié à la confidentialité, recherche en cours...');
+
+                // Chercher la page de politique de confidentialité
+                const privacyPolicyUrl = await findPrivacyPolicyPage();
+
+                if (privacyPolicyUrl && privacyPolicyUrl !== window.location.href) {
+                    console.log('Page de politique trouvée:', privacyPolicyUrl);
+
+                    // Vérifier qu'on n'est pas déjà sur une page de politique pour éviter les boucles
+                    const currentUrl = window.location.href.toLowerCase();
+                    const targetUrl = privacyPolicyUrl.toLowerCase();
+
+                    if (currentUrl !== targetUrl && !currentUrl.includes('privacy') && !currentUrl.includes('confidentialite')) {
+                        try {
+                            // Informer l'utilisateur de la redirection
+                            Showerror("No privacy-related content found on this page. Redirecting to privacy policy page...");
+
+                            // Attendre un moment pour que l'utilisateur puisse lire le message
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+
+                            // Rediriger vers la page de politique de confidentialité
+                            window.location.href = privacyPolicyUrl;
+                            return;
+
+                        } catch (redirectError) {
+                            console.error('Erreur lors de la redirection:', redirectError);
+                            Showerror('❌ Privacy policy page found but could not be accessed. Please navigate to the privacy policy page manually.');
+                            return;
+                        }
+                    } else {
+                        console.log('Déjà sur une page de politique ou même URL, pas de redirection');
+                        Showerror('❌ This appears to be a privacy policy page, but the content is insufficient or unclear for analysis.');
+                        return;
+                    }
+                } else {
+                    console.log('Aucune page de politique de confidentialité trouvée');
+                    Showerror('❌ No privacy-related content found on this website. Please look for a "Privacy Policy" or "Legal" section manually.');
+                    return;
+                }
             }
 
-            console.log('Appel de l\'API...'); // Debug
-            const analysis = await analyzePolicy(policyText);
-            console.log('Analyse terminée:', analysis); // Debug
-
-            showAnalysisPopup(analysis);
+            // Si l'analyse initiale est valide, afficher les résultats
+            console.log('Analyse valide, affichage des résultats'); // Debug
+            showAnalysisPopup(initialAnalysis);
 
         } catch (error) {
             console.error('Erreur lors de l\'analyse:', error);
-            showAnalysisPopup('❌ Erreur lors de l\'analyse. Veuillez réessayer.');
+            Showerror('❌ Error during analysis. Please try again.');
+        }
+    }
+
+    // Fonction pour détecter si le contenu semble être une politique de confidentialité
+    function isProbablyPrivacyPolicy(text) {
+        const privacyKeywords = [
+            'privacy policy', 'politique de confidentialité', 'personal data', 'données personnelles',
+            'cookies', 'data collection', 'collecte de données', 'third parties', 'tiers',
+            'data processing', 'traitement des données', 'user information', 'informations utilisateur'
+        ];
+
+        const lowerText = text.toLowerCase();
+        const keywordMatches = privacyKeywords.filter(keyword =>
+            lowerText.includes(keyword.toLowerCase())
+        ).length;
+
+        // Si au moins 3 mots-clés sont trouvés, c'est probablement une politique de confidentialité
+        return keywordMatches >= 3;
+    }
+
+    // Fonction pour trouver l'URL de la page de politique de confidentialité
+    async function findPrivacyPolicyPage() {
+        const selectors = [
+            'a[href*="privacy"]',
+            'a[href*="confidentialite"]',
+            'a[href*="privacy-policy"]',
+            'a[href*="politique-confidentialite"]',
+            'a[href*="privacidad"]',
+            'a[href*="datenschutz"]'
+        ];
+
+        const textPatterns = [
+            /privacy\s+policy/i,
+            /politique\s+de\s+confidentialité/i,
+            /confidentialité/i,
+            /privacy/i,
+            /datos\s+personales/i,
+            /datenschutz/i
+        ];
+
+        // Chercher par sélecteurs CSS
+        for (const selector of selectors) {
+            const links = document.querySelectorAll(selector);
+            for (const link of links) {
+                if (link.href && link.href !== window.location.href) {
+                    return link.href;
+                }
+            }
+        }
+
+        // Chercher par texte des liens
+        const allLinks = document.querySelectorAll('a');
+        for (const link of allLinks) {
+            const linkText = link.textContent.trim();
+            for (const pattern of textPatterns) {
+                if (pattern.test(linkText) && link.href && link.href !== window.location.href) {
+                    return link.href;
+                }
+            }
+        }
+
+        // Chercher dans le footer
+        const footer = document.querySelector('footer');
+        if (footer) {
+            const footerLinks = footer.querySelectorAll('a');
+            for (const link of footerLinks) {
+                const linkText = link.textContent.trim().toLowerCase();
+                if ((linkText.includes('privacy') || linkText.includes('confidentialité'))
+                    && link.href && link.href !== window.location.href) {
+                    return link.href;
+                }
+            }
+        }
+
+        // URLs communes à essayer
+        const commonPaths = [
+            '/privacy',
+            '/privacy-policy',
+            '/politique-confidentialite',
+            '/confidentialite',
+            '/legal/privacy',
+            '/privacy.html',
+            '/privacy.php'
+        ];
+
+        const baseUrl = window.location.origin;
+        for (const path of commonPaths) {
+            const testUrl = baseUrl + path;
+            if (await urlExists(testUrl)) {
+                return testUrl;
+            }
+        }
+
+        return null;
+    }
+
+    // Fonction pour vérifier si une URL existe
+    async function urlExists(url) {
+        try {
+            const response = await fetch(url, {
+                method: 'HEAD',
+                mode: 'no-cors'
+            });
+            return response.ok || response.type === 'opaque';
+        } catch {
+            return false;
+        }
+    }
+
+    // Fonction pour récupérer le contenu d'une page de politique de confidentialité
+    async function fetchPrivacyPolicyContent(url) {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const html = await response.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+
+            // Supprimer les scripts et styles
+            const scripts = doc.querySelectorAll('script, style');
+            scripts.forEach(el => el.remove());
+
+            // Extraire le texte visible
+            return doc.body.textContent || doc.body.innerText || '';
+
+        } catch (error) {
+            console.error('Erreur lors de la récupération du contenu:', error);
+            return null;
         }
     }
 
@@ -1180,34 +1527,43 @@ Policy content:
     }
 
     // Add CSS styles for animations
+    function isValidCSSColor(color) {
+        if (!color || typeof color !== 'string') return false;
+
+        // Check for valid CSS color formats
+        const colorRegex = /^(#[0-9A-Fa-f]{3,8}|rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)|rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*[\d.]+\s*\)|hsl\(\s*\d+\s*,\s*\d+%\s*,\s*\d+%\s*\)|hsla\(\s*\d+\s*,\s*\d+%\s*,\s*\d+%\s*,\s*[\d.]+\s*\)|[a-zA-Z]+)$/;
+
+        return colorRegex.test(color.trim());
+    }
+
+    const safeScrollbarColor = isValidCSSColor(primaryLightColor) ? primaryLightColor : '#cccccc';
+    const safeScrollbarHoverColor = isValidCSSColor(primaryColor) ? primaryColor : '#999999';
+
     const styleEnhancer = document.createElement("style");
-    styleEnhancer.innerHTML = `
-        @keyframes fadeInScale {
-            0% { opacity: 0; transform: scale(0.9); }
-            100% { opacity: 1; transform: scale(1); }
-        }
-
-        @keyframes ripple {
-            to { transform: scale(4); opacity: 0; }
-        }
-
-        button:hover {
-            transition: all 0.3s ease;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(67, 97, 238, 0.3);
-        }
-
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        ::-webkit-scrollbar-thumb {
-            background-color: ${primaryLightColor};
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background-color: ${primaryColor};
-        }
-    `;
+    styleEnhancer.textContent = `
+    @keyframes fadeInScale {
+        0% { opacity: 0; transform: scale(0.9); }
+        100% { opacity: 1; transform: scale(1); }
+    }
+    @keyframes ripple {
+        to { transform: scale(4); opacity: 0; }
+    }
+    button:hover {
+        transition: all 0.3s ease;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(67, 97, 238, 0.3);
+    }
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+    ::-webkit-scrollbar-thumb {
+        background-color: ${safeScrollbarColor};
+        border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background-color: ${safeScrollbarHoverColor};
+    }
+`;
     document.head.appendChild(styleEnhancer);
 
 })();
