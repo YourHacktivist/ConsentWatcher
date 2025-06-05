@@ -3,7 +3,7 @@
  <img src="banner.png" alt="Consent Watcher Banner" width="50%">
 </p>
 
-# Consent Watcher Lite
+# Consent Watcher
 [![Firefox Extension](https://img.shields.io/badge/Firefox-Extension-orange?style=for-the-badge&logo=firefox)](https://addons.mozilla.org/firefox/)
 [![License](https://img.shields.io/badge/License-WTFPL-blue?style=for-the-badge)](LICENSE)
 
