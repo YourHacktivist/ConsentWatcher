@@ -1,31 +1,31 @@
 <div align="center">
-
 <p align="center">
-  <img src="banner.png" alt="Consent Watcher Banner" width="50%">
+ <img src="banner.png" alt="Consent Watcher Banner" width="50%">
 </p>
 
 # Consent Watcher Lite
-
-[![Userscript Manager](https://img.shields.io/badge/Userscript%20Manager-Tampermonkey-blue?style=for-the-badge&logo=tampermonkey)](https://www.tampermonkey.net/)
+[![Firefox Extension](https://img.shields.io/badge/Firefox-Extension-orange?style=for-the-badge&logo=firefox)](https://addons.mozilla.org/firefox/)
 [![License](https://img.shields.io/badge/License-WTFPL-blue?style=for-the-badge)](LICENSE)
 
 <i>Analyze privacy policies effortlessly, right in your browser.</i>
-
 </div>
 
-**Consent Watcher Lite** is a Tampermonkey userscript that uses the OpenAI API to analyze privacy policies of websites you visit. It highlights key points like data collection, third-party sharing, user rights, tracking, and GDPR compliance.
+**Consent Watcher Lite** is a Firefox extension that uses AI to analyze privacy policies of websites you visit. Choose from multiple AI providers (GPT, Claude, Gemini, or Grok) and configure your API keys through a user-friendly interface. It automatically detects and finds privacy policy pages on websites, then highlights key points like data collection, third-party sharing, user rights, tracking, and GDPR compliance.
 
 ---
 
 ## Features
 
-- **One-click analysis**: A button appears on websites to trigger the scan.
+- **Automatic detection**: Automatically finds privacy policy and terms of service pages on websites
+- **Multiple AI providers**: Choose between GPT, Claude, Gemini, and Grok
+- **Graphical API key management**: Set your API keys easily through the extension's interface
+- **One-click analysis**: A button appears on websites to trigger the scan
 - **Key insights**:
-  - Types of personal data collected
-  - Third-party sharing
-  - Tracking technologies used
-  - User rights summary
-  - GDPR compliance estimate
+ - Types of personal data collected
+ - Third-party sharing
+ - Tracking technologies used
+ - User rights summary
+ - GDPR compliance estimate
 - **Actionable privacy tips** tailored to each policy
 - **Downloadable HTML report**
 - **Popup interface**: draggable and closable
@@ -34,34 +34,32 @@
 
 ## Getting Started
 
-1. Install [Tampermonkey](https://www.tampermonkey.net/).
-2. Add the script via the **Raw** button on GitHub or paste it manually in a new script.
-3. Open the script and set your OpenAI API key in the `openAiApiKey` variable:
-   ```js
-   const openAiApiKey = 'your-api-key-here';
-4. Visit any site, click "Analyze Privacy Policy" on the terms of use page, and view the results in a popup.
+1. Install the extension from the Firefox Add-ons store
+2. Click on the Consent Watcher Lite icon in your toolbar
+3. Choose your preferred AI provider (GPT, Claude, Gemini, or Grok)
+4. Enter your API key for the selected provider through the graphical interface
+5. Visit any website - the extension will automatically detect privacy policy pages and show the "Analyze Privacy Policy" button
+6. Click the button to view the AI analysis results in a popup
 
 ---
 
-### Modularity – Use Your Own AI Provider
+### Supported AI Providers
 
-Consent Watcher Lite has been designed to be easily customizable. The core logic that sends the website's privacy policy for analysis is contained in the `analyzePolicy()` function.
+- **OpenAI GPT**: Requires OpenAI API key
+- **Anthropic Claude**: Requires Anthropic API key
+- **Google Gemini**: Requires Google AI API key
+- **xAI Grok**: Requires xAI API key
 
-You can replace the OpenAI API with another AI service (e.g., Claude, Mistral, Cohere, or even a local LLM) by modifying this single function.
-
-#### How to customize
-1. Open the userscript in Tampermonkey.
-2. Locate the `analyzePolicy()` function.
-3. Replace the OpenAI API call with your own API logic.
-4. Make sure your replacement returns a string with the analysis summary.
+You can easily switch between providers and manage your API keys directly from the extension's settings panel.
 
 ---
 
 ## Privacy
 
-- Only visible page text is sent to OpenAI’s API for analysis.
-- No local data is stored.
-- Fully open-source for transparency.
+- Only visible page text is sent to your chosen AI provider's API for analysis
+- API keys are stored locally in your browser
+- No data is transmitted to third parties beyond your selected AI service
+- Fully open-source for transparency
 
 > **Note**: This tool provides automated analysis and is not a substitute for legal advice.
 
@@ -69,6 +67,6 @@ You can replace the OpenAI API with another AI service (e.g., Claude, Mistral, C
 
 ## Contributing
 
-Contributions are welcome ! You can modify and improve the project by submitting merge requests anytime.
+Contributions are welcome! You can modify and improve the project by submitting merge requests anytime.
 
 > <i>Understand your privacy rights. Effortlessly.</i>
